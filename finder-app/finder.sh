@@ -4,7 +4,7 @@ echo Writer Shell file
 
 #checking if 2 inputs are provided or not
 if [[ $# -ne 2 ]]; then
-	echo "ERROR : INVALID INPUT"
+	echo "ERROR : filesdir/searchstr are not provided"
 	exit 1
 fi
 
@@ -35,27 +35,17 @@ do
 	#Checking if its a regular file
 	if [[ -f "$i" ]];
 	then
-		#checking if it has searchstr or not
+	
 		# Check if the file contains the search string
 		if grep -q "$searchstr" "$i"; then
-		    echo "Found $searchstr in $i"
 		    number_of_occurance=$((number_of_occurance+1))
 		fi
 
-		#if [[ "$i" == *"$searchstr"* ]];
-		#then 
-		#	echo "Found $searchstr"
-		#	number_of_occurance=$((number_of_occurance+1));
-		
-		#fi
 	fi
 	number_of_files=$((number_of_files+1));
 	
 done
 
-echo "Total number of files : $number_of_files"
-echo "Total occurance of $searchstr : $number_of_occurance"
-echo "Program end"
 
 echo "The number of files are $number_of_files and the number of matching lines are $number_of_occurance in Writer Shell file"	
 	
