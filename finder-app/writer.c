@@ -6,7 +6,7 @@
 #include <string.h>
 #include <syslog.h>
 
-int read_write(const char *file_path, const char *file_content, int num_of_input);
+int read_write(const char *file_path, const char *file_content);
 
 int main(int argc, char *argv[])
 {
@@ -16,17 +16,6 @@ int main(int argc, char *argv[])
 	const char *file_content = argv[2];
 	int num_of_input = argc;
 	
-
-	read_write(file_path, file_content, num_of_input);
-	
-
-}
-
-int read_write(const char *file_path, const char *file_content, int num_of_input)
-{
-	//Opening syslog functionality
-	openlog("writer", LOG_PID, LOG_USER);
-	
 	if( num_of_input != 3)
 	{
 		printf("Wrong Input\n");
@@ -34,6 +23,17 @@ int read_write(const char *file_path, const char *file_content, int num_of_input
 		return 1;		
 	}
 	
+	read_write(file_path, file_content);
+	
+
+}
+
+int read_write(const char *file_path, const char *file_content)
+{
+	//Opening syslog functionality
+	openlog("writer", LOG_PID, LOG_USER);
+	
+
 	// Abstracting the file name from a path
 	const char *file_name;
 	file_name = strrchr(file_path, '/');

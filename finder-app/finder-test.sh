@@ -2,6 +2,9 @@
 # Tester script for assignment 1 and assignment 2
 # Author: Siddhant Jajoo
 
+#giving make command to generate writer.o in first place
+make 
+
 set -e
 set -u
 
