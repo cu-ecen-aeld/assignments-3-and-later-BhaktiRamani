@@ -37,7 +37,7 @@ do
 	then
 	
 		# Check if the file contains the search string
-		if grep -q "$searchstr" "$i"; then
+		if sudo grep -q "$searchstr" "$i"; then
 		    number_of_occurance=$((number_of_occurance+1))
 		fi
 
@@ -46,7 +46,7 @@ do
 	
 done
 
-
+echo " "
 echo "The number of files are $number_of_files and the number of matching lines are $number_of_occurance in Writer Shell file"	
 	
 	
