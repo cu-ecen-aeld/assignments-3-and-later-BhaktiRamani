@@ -45,7 +45,7 @@ int read_write(const char *file_path, const char *file_content)
 	// Opening the file with read write and execute permission
 	int fd;
 	
-	fd = open(file_path, O_RDWR | O_CREAT | O_APPEND | S_IRWXG);
+	fd = open(file_path, O_RDWR | O_CREAT | O_APPEND , S_IRWXG);
 	if(fd == -1)
 	{
 		printf("File open error\n");

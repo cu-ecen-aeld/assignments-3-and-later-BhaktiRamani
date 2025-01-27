@@ -1,10 +1,25 @@
+CC = $(CROSS_COMPILE)gcc
+CXX = $(CROSS_COMPILE)g++
 
+# Source and target files
 
-writermake : writer.c
-	gcc writer.c -o writer
+SRC = writer.c
+TARGET = writer
+
+# Compilation flags
+CFLAGS = -Wall -O2
+LDFLAGS =
+
+# Build Targets
+all : $(TARGET)
+
+$(TARGET): $(SRC)
+	$(CC) $(CFLAGS) $(SRC) -o $(TARGET)
+
 	
 .PHONY: clean
 
 clean:
-	rm -f *.o writer
+	rm -f *.o $(TARGET)
+
 
