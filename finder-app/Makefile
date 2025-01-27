@@ -1,4 +1,11 @@
-CC = $(CROSS_COMPILE)gcc
+ifeq ($(origin CROSS_COMPILE), undefined)
+    CC = gcc
+else ifeq ($(CROSS_COMPILE),aarch64-none-linux-gnu-)
+    CC = $(CROSS_COMPILE)gcc
+else
+    CC = gcc
+endif
+
 CXX = $(CROSS_COMPILE)g++
 
 # Source and target files
