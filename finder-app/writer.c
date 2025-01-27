@@ -1,3 +1,18 @@
+// ========================================================================
+// Author: Bhakti Ramani
+// Date: 2025-01-26
+// University: University of Colorado Boulder
+// Subject: ECEN 5713 Advanced Embedded Linux Development
+//
+// File Description:
+// Works same as writer.sh file, makes a file in given path and content using
+// syscalls and throws messages using syslog
+// to run a file normally, type ./writer (PATH) (CONTENT_OF_FILE)
+// to check error or messages on system, type sudo cat /var/log/syslog | grep "mesg" 
+//
+// File Name: writer.c
+// ========================================================================
+
 #include <stdio.h>
 #include <sys/types.h>
 #include <sys/stat.h>
@@ -71,8 +86,6 @@ int read_write(const char *file_path, const char *file_content)
 	//Closing syslog
 	closelog();
 	return 0;
-	
-	
 	
 	
 

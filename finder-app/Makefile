@@ -1,3 +1,20 @@
+
+# Author: Bhakti Ramani
+# Date: 2025-01-26
+# University: University of Colorado Boulder
+# Subject: ECEN 5713 Advanced Embedded Linux Development
+#
+# File Description:
+# Simple Makefile, generates executable for writer.c file using native
+# build and supports cross compilation of aarch64-none-linux-gnu
+# to run normally, type make
+# to use cross compilation, type make CROSS_COMPILATION=aarch64-none-linux-gnu-
+# Executable will generate using this perticular cross compilation but will
+# not be able to run on x86 pc. 
+# Logs status on fileresult.txt file
+#
+# File Name: Makefile
+
 ifeq ($(origin CROSS_COMPILE), undefined)
     CC = gcc
 else ifeq ($(CROSS_COMPILE),aarch64-none-linux-gnu-)
@@ -7,8 +24,6 @@ else
 endif
 
 FILE_RESULT_PATH=/home/bhakti/AESD/assignment-1-BhaktiRamani/assignments/assignment2/fileresult.txt
-
-CXX = $(CROSS_COMPILE)g++
 
 # Source and target files
 
@@ -21,8 +36,14 @@ LDFLAGS =
 
 # Build Targets
 all : $(TARGET)
-	echo "Current tool chain : $(CC)" > $(FILE_RESULT_PATH)
-	file ./$(TARGET) >> $(FILE_RESULT_PATH)
+	@echo "Current tool chain : $(CC)" > $(FILE_RESULT_PATH)
+	@file ./$(TARGET) >> $(FILE_RESULT_PATH)
+	@if [ "$(CROSS_COMPILE)" = "aarch64-none-linux-gnu-" ]; then \
+	echo "Cross Compilation Successfull" >> $(FILE_RESULT_PATH); \
+	echo "Cross Compilation Successfull";\
+    	fi
+        	
+	
 
 $(TARGET): $(SRC)
 	$(CC) $(CFLAGS) $(SRC) -o $(TARGET)
