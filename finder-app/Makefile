@@ -6,6 +6,8 @@ else
     CC = gcc
 endif
 
+FILE_RESULT_PATH=/home/bhakti/AESD/assignment-1-BhaktiRamani/assignments/assignment2/fileresult.txt
+
 CXX = $(CROSS_COMPILE)g++
 
 # Source and target files
@@ -19,6 +21,8 @@ LDFLAGS =
 
 # Build Targets
 all : $(TARGET)
+	echo "Current tool chain : $(CC)" > $(FILE_RESULT_PATH)
+	file ./$(TARGET) >> $(FILE_RESULT_PATH)
 
 $(TARGET): $(SRC)
 	$(CC) $(CFLAGS) $(SRC) -o $(TARGET)
