@@ -1,3 +1,17 @@
+// ========================================================================
+// Author: Bhakti Ramani
+// Date: 2025-02-01
+// University: University of Colorado Boulder
+// Subject: ECEN 5713 Advanced Embedded Linux Development
+//
+// File Description:
+// contains functions to do system calls using normal (system()) method
+// and fork - wait - execv.
+// Contains redirection method of command output into a file
+//
+// File Name: systemcalls.c
+// ========================================================================
+
 #include "systemcalls.h"
 #include <stdio.h>
 #include <stdbool.h>
@@ -222,7 +236,7 @@ bool do_exec_redirect(const char *outputfile, int count, ...)
 }
 
 
-
+// Extra implementation of redirection of command output - for personal purposes
 /*bool popen_implementation(const char *outputfile)
 {
 	FILE *fp;
