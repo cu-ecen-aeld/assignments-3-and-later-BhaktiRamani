@@ -110,14 +110,24 @@ echo $(ls ${OUTDIR}/rootfs/lib)
 
 
 # TODO: Make device nodes
+# creating a device/special file - giving permision as mode - permissions - path for newly created file - character file - major no(memory driver) - minor no(specific driver)
 sudo mknod -m 666 dev/null c 1 3
 sudo mknod -m 600 dev/console c 5 1
 
 # TODO: Clean and build the writer utility
+# Go to finder app directory
+cd $(pwd)
+make clean
+make CROSS_COMPILE=aarch64-none-linux-gnu-
 
 # TODO: Copy the finder related scripts and executables to the /home directory
+# copy command - source destination
+
+
 # on the target rootfs
+cd rootfs/
 
 # TODO: Chown the root directory
+sudo chown -R root:root *
 
 # TODO: Create initramfs.cpio.gz
