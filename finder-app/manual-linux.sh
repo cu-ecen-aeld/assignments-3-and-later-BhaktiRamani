@@ -96,8 +96,22 @@ ${CROSS_COMPILE}readelf -a bin/busybox | grep "program interpreter"
 ${CROSS_COMPILE}readelf -a bin/busybox | grep "Shared library"
 
 # TODO: Add library dependencies to rootfs
+# ldd busy box prints shared library and program interpreter both
+cd "$OUTDIR/rootfs/lib64"
+# Copying shared library to lib64 - because we are using Arch64
+${CROSS_COMPILE}ldd busybox | grep "=>" | awk '{print $3}' | xargs -I {} cp {} $OUTDIR/rootfs/lib64/
+# Copying/Adding necessary program interpreter to lib
+INTERPRETER=$(${CROSS_COMPILE}ldd busybox | grep "ld-linux" | awk '{print $1}')
+cp $INTERPRETER ${OUTDIR}/rootfs/lib/
+
+echo "Library Dependencies added"
+echo $(ls ${OUTDIR}/rootfs/lib64)
+echo $(ls ${OUTDIR}/rootfs/lib)
+
 
 # TODO: Make device nodes
+sudo mknod -m 666 dev/null c 1 3
+sudo mknod -m 600 dev/console c 5 1
 
 # TODO: Clean and build the writer utility
 
