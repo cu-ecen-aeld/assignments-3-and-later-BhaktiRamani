@@ -35,6 +35,24 @@ if [ ! -e ${OUTDIR}/linux-stable/arch/${ARCH}/boot/Image ]; then
     git checkout ${KERNEL_VERSION}
 
     # TODO: Add your kernel build steps here
+    # Cleaning any .config files
+    make ARCH=arm64 CROSS_COMPILE=aarch64-none-linux-gnu-mrproper
+    
+    # Specifying defconfig
+    make ARCH=arm64 CROSS_COMPILE=aarch64-none-linux-gnu-defconfig
+    
+    # QEMU kernel build vmlinux
+    make -j4 ARCH=arm64 CROSS_COMPILE=aarch64-none-linux-gnu-all
+    
+    # Adding kernel modules and devicetree
+    make ARCH=arm64 CROSS_COMPILE=aarch64-none-linux-gnu-modules
+    make ARCH=arm64 CROSS_COMPILE=aarch64-none-linux-gnu-dtbs
+    
+    # Copying results to the output directory
+    cp ${OUTDIR}/linux-stable/arch/${ARCH}/boot/Image ${OUTDIR}/
+    echo "Kernel Build complete"
+    
+    
 fi
 
 echo "Adding the Image in outdir"
@@ -48,6 +66,12 @@ then
 fi
 
 # TODO: Create necessary base directories
+# Creating root file system in output directory and making basic directories
+mkdir "$OUTDIR/rootfs"
+cd "$OUTDIR/rootfs"
+mkdir -p bin dev etc home lib lib64 proc sbin sys tmp usr var
+mkdir -p usr/bin usr/bin usr/sbin
+mkdir -p var/log
 
 cd "$OUTDIR"
 if [ ! -d "${OUTDIR}/busybox" ]
@@ -56,11 +80,16 @@ git clone git://busybox.net/busybox.git
     cd busybox
     git checkout ${BUSYBOX_VERSION}
     # TODO:  Configure busybox
+    make distclean
+    make defconfig
+   
 else
     cd busybox
 fi
 
 # TODO: Make and install busybox
+make ARCH=${ARCH} CROSS_COMPILE=${CROSS_COMPILE}
+make CONFIG_PREFIX=/path/to/rootdir ARCH=${ARCH} CROSS_COMPILE=${CROSS_COMPILE} install
 
 echo "Library dependencies"
 ${CROSS_COMPILE}readelf -a bin/busybox | grep "program interpreter"

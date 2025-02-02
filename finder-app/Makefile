@@ -15,13 +15,7 @@
 #
 # File Name: Makefile
 
-ifeq ($(origin CROSS_COMPILE), undefined)
-    CC = gcc
-else ifeq ($(CROSS_COMPILE),aarch64-none-linux-gnu-)
-    CC = $(CROSS_COMPILE)gcc
-else
-    CC = gcc
-endif
+CC = $(CROSS_COMPILE)gcc
 
 FILE_RESULT_PATH=/home/bhakti/AESD/assignment-1-BhaktiRamani/assignments/assignment2/fileresult.txt
 
