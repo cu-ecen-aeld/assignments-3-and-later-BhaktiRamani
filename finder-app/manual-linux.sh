@@ -11,7 +11,8 @@ KERNEL_VERSION=v5.15.163
 BUSYBOX_VERSION=1_33_1
 FINDER_APP_DIR=$(realpath $(dirname $0))
 ARCH=arm64
-CROSS_COMPILE=aarch64-none-linux-gnu-
+#CROSS_COMPILE=${CROSS_COMPILE}-
+CROSS_COMPILE=/home/bhakti/Downloads/arm-gnu-toolchain-13.3.rel1-x86_64-aarch64-none-linux-gnu/bin/aarch64-none-linux-gnu
 
 if [ $# -lt 1 ]
 then
@@ -36,24 +37,26 @@ if [ ! -e ${OUTDIR}/linux-stable/arch/${ARCH}/boot/Image ]; then
 
     # TODO: Add your kernel build steps here
     # Cleaning any .config files
-    make ARCH=arm64 CROSS_COMPILE=aarch64-none-linux-gnu- mrproper
+    make ARCH=arm64 CROSS_COMPILE=${CROSS_COMPILE}- mrproper
     
     # Specifying defconfig
-    make ARCH=arm64 CROSS_COMPILE=aarch64-none-linux-gnu- defconfig
+    make ARCH=arm64 CROSS_COMPILE=${CROSS_COMPILE}- defconfig
     
     # QEMU kernel build vmlinux
-    make -j4 ARCH=arm64 CROSS_COMPILE=aarch64-none-linux-gnu- all
+    make -j4 ARCH=arm64 CROSS_COMPILE=${CROSS_COMPILE}- all
     
     # Adding kernel modules and devicetree
-    make ARCH=arm64 CROSS_COMPILE=aarch64-none-linux-gnu- modules
-    make ARCH=arm64 CROSS_COMPILE=aarch64-none-linux-gnu- dtbs
+    make ARCH=arm64 CROSS_COMPILE=${CROSS_COMPILE}- modules
+    make ARCH=arm64 CROSS_COMPILE=${CROSS_COMPILE}- dtbs
        
 fi
 
-echo "Adding the Image in outdir"
-# Copying results to the output directory
-cp ${OUTDIR}/linux-stable/arch/${ARCH}/boot/Image ${OUTDIR}
 echo "Kernel Build complete"
+
+# Copying results to the output directory
+echo "Adding the Image in outdir"
+cp ${OUTDIR}/linux-stable/arch/${ARCH}/boot/Image ${OUTDIR}/Image
+
 
 echo "Creating the staging directory for the root filesystem"
 cd "$OUTDIR"
@@ -88,7 +91,7 @@ fi
 
 # TODO: Make and install busybox
 make ARCH=${ARCH} CROSS_COMPILE=${CROSS_COMPILE}
-make CONFIG_PREFIX=${OUTDIR}/rootfs ARCH=${ARCH} CROSS_COMPILE=${CROSS_COMPILE} install
+make CONFIG_PREFIX="${OUTDIR}/rootfs" ARCH=${ARCH} CROSS_COMPILE=${CROSS_COMPILE} install
 
 cd "${OUTDIR}/rootfs"
 
@@ -119,7 +122,7 @@ sudo mknod -m 600 dev/console c 5 1
 # Go to finder app directory
 cd ${FINDER_APP_DIR}
 make clean
-make CROSS_COMPILE=aarch64-none-linux-gnu-
+make CROSS_COMPILE=${CROSS_COMPILE}-
 
 # TODO: Copy the finder related scripts and executables to the /home directory
 # copy command - source destination
