@@ -12,7 +12,7 @@ BUSYBOX_VERSION=1_33_1
 FINDER_APP_DIR=$(realpath $(dirname $0))
 ARCH=arm64
 #CROSS_COMPILE=${CROSS_COMPILE}-
-CROSS_COMPILE=/home/bhakti/Downloads/arm-gnu-toolchain-13.3.rel1-x86_64-aarch64-none-linux-gnu/bin/aarch64-none-linux-gnu
+CROSS_COMPILE=/home/bhakti/Downloads/arm-gnu-toolchain-13.3.rel1-x86_64-aarch64-none-linux-gnu/bin/aarch64-none-linux-gnu-
 
 if [ $# -lt 1 ]
 then
@@ -38,17 +38,17 @@ if [ ! -e ${OUTDIR}/linux-stable/arch/${ARCH}/boot/Image ]; then
 
     # TODO: Add your kernel build steps here
     # Cleaning any .config files
-    make ARCH=arm64 CROSS_COMPILE=${CROSS_COMPILE}- mrproper
+    make ARCH=arm64 CROSS_COMPILE=${CROSS_COMPILE} mrproper
     
     # Specifying defconfig
-    make ARCH=arm64 CROSS_COMPILE=${CROSS_COMPILE}- defconfig
+    make ARCH=arm64 CROSS_COMPILE=${CROSS_COMPILE} defconfig
     
     # QEMU kernel build vmlinux
-    make -j4 ARCH=arm64 CROSS_COMPILE=${CROSS_COMPILE}- all
+    make -j4 ARCH=arm64 CROSS_COMPILE=${CROSS_COMPILE} all
     
     # Adding kernel modules and devicetree
-    make ARCH=arm64 CROSS_COMPILE=${CROSS_COMPILE}- modules
-    make ARCH=arm64 CROSS_COMPILE=${CROSS_COMPILE}- dtbs
+    make ARCH=arm64 CROSS_COMPILE=${CROSS_COMPILE} modules
+    make ARCH=arm64 CROSS_COMPILE=${CROSS_COMPILE} dtbs
     echo "Checkpoint 2" 
 fi
 
@@ -111,15 +111,6 @@ cp /home/bhakti/Downloads/arm-gnu-toolchain-13.3.rel1-x86_64-aarch64-none-linux-
 
 #TODO: Add library dependencies to rootfs
 
-# TODO: Add library dependencies to rootfs
-# ldd busy box prints shared library and program interpreter both
-#cd "$OUTDIR/rootfs/lib64"
-# Copying shared library to lib64 - because we are using Arch64
-#${CROSS_COMPILE}ldd busybox | grep "=>" | awk '{print $3}' | xargs -I {} cp {} $OUTDIR/rootfs/lib64/
-# Copying/Adding necessary program interpreter to lib
-#INTERPRETER=$(${CROSS_COMPILE}ldd busybox | grep "ld-linux" | awk '{print $1}')
-#cp $INTERPRETER ${OUTDIR}/rootfs/lib/
-
 echo "Library Dependencies added"
 #echo $(ls ${OUTDIR}/rootfs/lib64)
 #echo $(ls ${OUTDIR}/rootfs/lib)
@@ -130,21 +121,10 @@ echo "Library Dependencies added"
 #cd "${OUTDIR}/rootfs"
 
 sudo rm -f /dev/null
-#sudo mknod -m 666 /dev/null c 1 3
+sudo mknod -m 666 /dev/null c 1 3
 
 sudo rm -f /dev/console
-#sudo mknod -m 600 /dev/console c 5 1
-
-sudo rm -f /dev/tty
-#sudo mknod -m 600 /dev/tty c 5 0
-#chown root:tty /dev/{console,ptmx,tty}
-
-mount -n -t tmpfs none /dev
-mknod -m 622 /dev/console c 5 1
-mknod -m 666 /dev/null c 1 3
-mknod -m 666 /dev/zero c 1 5
-mknod -m 666 /dev/tty c 5 0 
-chown root:tty /dev/{console,tty}
+sudo mknod -m 600 /dev/console c 5 1
 
 echo "Noed Added"
 
