@@ -12,7 +12,7 @@ BUSYBOX_VERSION=1_33_1
 FINDER_APP_DIR=$(realpath $(dirname $0))
 ARCH=arm64
 #CROSS_COMPILE=${CROSS_COMPILE}-
-CROSS_COMPILE=/home/bhakti/Downloads/arm-gnu-toolchain-13.3.rel1-x86_64-aarch64-none-linux-gnu/bin/aarch64-none-linux-gnu-
+CROSS_COMPILE=/home/bhakti/Downloads/arm-gnu-toolchain-13.3.rel1-x86_64-aarch64-none-linux-gnu/bin/aarch64-none-linux-gnu
 
 if [ $# -lt 1 ]
 then
@@ -25,6 +25,7 @@ fi
 mkdir -p ${OUTDIR}
 
 cd "$OUTDIR"
+echo "Checkpoint 1"
 if [ ! -d "${OUTDIR}/linux-stable" ]; then
     #Clone only if the repository does not exist.
 	echo "CLONING GIT LINUX STABLE VERSION ${KERNEL_VERSION} IN ${OUTDIR}"
@@ -48,7 +49,7 @@ if [ ! -e ${OUTDIR}/linux-stable/arch/${ARCH}/boot/Image ]; then
     # Adding kernel modules and devicetree
     make ARCH=arm64 CROSS_COMPILE=${CROSS_COMPILE}- modules
     make ARCH=arm64 CROSS_COMPILE=${CROSS_COMPILE}- dtbs
-       
+    echo "Checkpoint 2" 
 fi
 
 echo "Kernel Build complete"
@@ -78,8 +79,8 @@ mkdir -p var/log
 cd "$OUTDIR"
 if [ ! -d "${OUTDIR}/busybox" ]
 then
-#git clone git://busybox.net/busybox.git
-git clone git@github.com:mirror/busybox.git
+git clone https://github.com/mirror/busybox.git
+#git clone git@github.com:mirror/busybox.git
 
 	    cd busybox
     git checkout ${BUSYBOX_VERSION}
@@ -129,10 +130,21 @@ echo "Library Dependencies added"
 #cd "${OUTDIR}/rootfs"
 
 sudo rm -f /dev/null
-sudo mknod -m 666 /dev/null c 1 3
+#sudo mknod -m 666 /dev/null c 1 3
 
 sudo rm -f /dev/console
-sudo mknod -m 600 /dev/console c 5 1
+#sudo mknod -m 600 /dev/console c 5 1
+
+sudo rm -f /dev/tty
+#sudo mknod -m 600 /dev/tty c 5 0
+#chown root:tty /dev/{console,ptmx,tty}
+
+mount -n -t tmpfs none /dev
+mknod -m 622 /dev/console c 5 1
+mknod -m 666 /dev/null c 1 3
+mknod -m 666 /dev/zero c 1 5
+mknod -m 666 /dev/tty c 5 0 
+chown root:tty /dev/{console,tty}
 
 echo "Noed Added"
 
