@@ -12,7 +12,7 @@ BUSYBOX_VERSION=1_33_1
 FINDER_APP_DIR=$(realpath $(dirname $0))
 ARCH=arm64
 #CROSS_COMPILE=${CROSS_COMPILE}-
-CROSS_COMPILE=/home/bhakti/Downloads/arm-gnu-toolchain-13.3.rel1-x86_64-aarch64-none-linux-gnu/bin/aarch64-none-linux-gnu
+CROSS_COMPILE=/home/bhakti/Downloads/arm-gnu-toolchain-13.3.rel1-x86_64-aarch64-none-linux-gnu/bin/aarch64-none-linux-gnu-
 
 if [ $# -lt 1 ]
 then
@@ -74,11 +74,14 @@ mkdir -p bin dev etc home lib lib64 proc sbin sys tmp usr var
 mkdir -p usr/bin usr/bin usr/sbin
 mkdir -p var/log
 
+
 cd "$OUTDIR"
 if [ ! -d "${OUTDIR}/busybox" ]
 then
-git clone git://busybox.net/busybox.git
-    cd busybox
+#git clone git://busybox.net/busybox.git
+git clone git@github.com:mirror/busybox.git
+
+	    cd busybox
     git checkout ${BUSYBOX_VERSION}
     # TODO:  Configure busybox
     echo "Busy box configuration"
@@ -86,6 +89,7 @@ git clone git://busybox.net/busybox.git
     make defconfig
    
 else
+    echo "Busy box already configured"
     cd busybox
 fi
 
@@ -93,20 +97,27 @@ fi
 make ARCH=${ARCH} CROSS_COMPILE=${CROSS_COMPILE}
 make CONFIG_PREFIX="${OUTDIR}/rootfs" ARCH=${ARCH} CROSS_COMPILE=${CROSS_COMPILE} install
 
-cd "${OUTDIR}/rootfs"
+cd "${OUTDIR}"
 
 echo "Library dependencies"
-${CROSS_COMPILE}readelf -a bin/busybox | grep "program interpreter"
-${CROSS_COMPILE}readelf -a bin/busybox | grep "Shared library"
+${CROSS_COMPILE}readelf -a ./rootfs/bin/busybox | grep "program interpreter"
+${CROSS_COMPILE}readelf -a ./rootfs/bin/busybox | grep "Shared library"
+
+cp /home/bhakti/Downloads/arm-gnu-toolchain-13.3.rel1-x86_64-aarch64-none-linux-gnu/aarch64-none-linux-gnu/libc/lib/ld-linux-aarch64.so.1 ${OUTDIR}/rootfs/lib
+cp /home/bhakti/Downloads/arm-gnu-toolchain-13.3.rel1-x86_64-aarch64-none-linux-gnu/aarch64-none-linux-gnu/libc/lib64/libm.so.6 ${OUTDIR}/rootfs/lib64/
+cp /home/bhakti/Downloads/arm-gnu-toolchain-13.3.rel1-x86_64-aarch64-none-linux-gnu/aarch64-none-linux-gnu/libc/lib64/libresolv.so.2 ${OUTDIR}/rootfs/lib64/
+cp /home/bhakti/Downloads/arm-gnu-toolchain-13.3.rel1-x86_64-aarch64-none-linux-gnu/aarch64-none-linux-gnu/libc/lib64/libc.so.6 ${OUTDIR}/rootfs/lib64/
+
+#TODO: Add library dependencies to rootfs
 
 # TODO: Add library dependencies to rootfs
 # ldd busy box prints shared library and program interpreter both
-cd "$OUTDIR/rootfs/lib64"
+#cd "$OUTDIR/rootfs/lib64"
 # Copying shared library to lib64 - because we are using Arch64
-${CROSS_COMPILE}ldd busybox | grep "=>" | awk '{print $3}' | xargs -I {} cp {} $OUTDIR/rootfs/lib64/
+#${CROSS_COMPILE}ldd busybox | grep "=>" | awk '{print $3}' | xargs -I {} cp {} $OUTDIR/rootfs/lib64/
 # Copying/Adding necessary program interpreter to lib
-INTERPRETER=$(${CROSS_COMPILE}ldd busybox | grep "ld-linux" | awk '{print $1}')
-cp $INTERPRETER ${OUTDIR}/rootfs/lib/
+#INTERPRETER=$(${CROSS_COMPILE}ldd busybox | grep "ld-linux" | awk '{print $1}')
+#cp $INTERPRETER ${OUTDIR}/rootfs/lib/
 
 echo "Library Dependencies added"
 #echo $(ls ${OUTDIR}/rootfs/lib64)
@@ -115,12 +126,19 @@ echo "Library Dependencies added"
 
 # TODO: Make device nodes
 # creating a device/special file - giving permision as mode - permissions - path for newly created file - character file - major no(memory driver) - minor no(specific driver)
-sudo mknod -m 666 dev/null c 1 3
-sudo mknod -m 600 dev/console c 5 1
+#cd "${OUTDIR}/rootfs"
+
+sudo rm -f /dev/null
+sudo mknod -m 666 /dev/null c 1 3
+
+sudo rm -f /dev/console
+sudo mknod -m 600 /dev/console c 5 1
+
+echo "Noed Added"
 
 # TODO: Clean and build the writer utility
 # Go to finder app directory
-cd "${FINDER_APP_DIR}"
+cd /home/bhakti/Work/assignments-3-and-later-BhaktiRamani/finder-app
 make clean
 make CROSS_COMPILE=${CROSS_COMPILE}
 
@@ -128,7 +146,7 @@ make CROSS_COMPILE=${CROSS_COMPILE}
 # copy command - source destination
 cp ${FINDER_APP_DIR}/finder* ${OUTDIR}/rootfs/home/
 cp ${FINDER_APP_DIR}/writer ${OUTDIR}/rootfs/home/
-cp ${FINDER_APP_DIR}/autorun-qemo.sh ${OUTDIR}/rootfs/home/
+cp ${FINDER_APP_DIR}/autorun-qemu.sh ${OUTDIR}/rootfs/home/
 cp -rL ${FINDER_APP_DIR}/conf ${OUTDIR}/rootfs/home/
 
 #matches=$(ls | grep -E 'finder|writer|autorun-qemu.sh|conf')
@@ -148,7 +166,8 @@ cd "${OUTDIR}/rootfs"
 sudo chown -R root:root *
 
 # TODO: Create initramfs.cpio.gz
+cd "${OUTDIR}/rootfs"
 find .| cpio -H newc -ov --owner root:root > ${OUTDIR}/initramfs.cpio
-cd ${OUTDIR}
+cd "${OUTDIR}"
 gzip -f initramfs.cpio
 #mv initramfs.cpio.gz ${OUTDIR}
