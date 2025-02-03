@@ -38,17 +38,17 @@ if [ ! -e ${OUTDIR}/linux-stable/arch/${ARCH}/boot/Image ]; then
 
     # TODO: Add your kernel build steps here
     # Cleaning any .config files
-    make ARCH=arm64 CROSS_COMPILE=${CROSS_COMPILE} mrproper
+    make ARCH=arm64 CROSS_COMPILE=${CROSS_COMPILE}- mrproper
     
     # Specifying defconfig
-    make ARCH=arm64 CROSS_COMPILE=${CROSS_COMPILE} defconfig
+    make ARCH=arm64 CROSS_COMPILE=${CROSS_COMPILE}- defconfig
     
     # QEMU kernel build vmlinux
-    make -j4 ARCH=arm64 CROSS_COMPILE=${CROSS_COMPILE} all
+    make -j4 ARCH=arm64 CROSS_COMPILE=${CROSS_COMPILE}- all
     
     # Adding kernel modules and devicetree
-    make ARCH=arm64 CROSS_COMPILE=${CROSS_COMPILE} modules
-    make ARCH=arm64 CROSS_COMPILE=${CROSS_COMPILE} dtbs
+    make ARCH=arm64 CROSS_COMPILE=${CROSS_COMPILE}- modules
+    make ARCH=arm64 CROSS_COMPILE=${CROSS_COMPILE}- dtbs
     echo "Checkpoint 2" 
 fi
 
