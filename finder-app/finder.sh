@@ -1,4 +1,4 @@
-#!/bin/bash
+#!/bin/sh
 
 echo Writer Shell file
 
@@ -37,7 +37,7 @@ do
 	then
 	
 		# Check if the file contains the search string
-		if sudo grep -q "$searchstr" "$i"; then
+		if grep -q "$searchstr" "$i"; then
 		    number_of_occurance=$((number_of_occurance+1))
 		fi
 
