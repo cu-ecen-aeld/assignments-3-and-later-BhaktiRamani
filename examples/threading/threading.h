@@ -29,6 +29,7 @@ struct thread_data{
     bool thread_complete_success;
 };
 
+void* threadfunc(void* thread_param);
 
 /**
 * Start a thread which sleeps @param wait_to_obtain_ms number of milliseconds, then obtains the

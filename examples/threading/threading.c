@@ -16,6 +16,12 @@ void* threadfunc(void* thread_param)
     // hint: use a cast like the one below to obtain thread arguments from your parameter
     struct thread_data* thread_func_args = (struct thread_data *) thread_param;
 
+
+    if(thread_func_args == NULL)
+   {
+   	ERROR_LOG("Function Arguments are NULL\n");
+   	return NULL;	
+   }
     // Waiting for certain time - custom sleep function
     int wait_to_obtain_ms = thread_func_args->wait_to_obtain_ms;
     char command1[100];
@@ -69,6 +75,11 @@ bool start_thread_obtaining_mutex(pthread_t *thread, pthread_mutex_t *mutex,int 
      * See implementation details in threading.h file comment block
      */
 
+    if(thread == NULL || mutex == NULL)
+    {
+        ERROR_LOG("Invalid Arguments\n");
+        return false;
+    }
     //Allocating memory for thread data dynamically
     struct thread_data *data = malloc(sizeof(struct thread_data));
     if (!data) {
