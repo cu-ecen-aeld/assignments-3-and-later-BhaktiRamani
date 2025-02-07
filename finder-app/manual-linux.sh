@@ -9,10 +9,11 @@ OUTDIR=/tmp/aeld
 KERNEL_REPO=git://git.kernel.org/pub/scm/linux/kernel/git/stable/linux-stable.git
 KERNEL_VERSION=v5.15.163
 BUSYBOX_VERSION=1_33_1
-FINDER_APP_DIR=$(realpath $(dirname $0))
+FINDER_APP_DIR=/home/bakri/Work/1_CU_Boulder/AESD/assignments-3-and-later-BhaktiRamani/finder-app
 ARCH=arm64
 #CROSS_COMPILE=${CROSS_COMPILE}-
-CROSS_COMPILE=/home/bhakti/Downloads/arm-gnu-toolchain-13.3.rel1-x86_64-aarch64-none-linux-gnu/bin/aarch64-none-linux-gnu-
+CROSS_COMPILE=/home/bakri/bin/arm-gnu-toolchain-13.3.rel1-x86_64-aarch64-none-linux-gnu/bin/aarch64-none-linux-gnu-
+LIBC_PATH=/home/bakri/bin/arm-gnu-toolchain-13.3.rel1-x86_64-aarch64-none-linux-gnu/aarch64-none-linux-gnu/libc
 
 if [ $# -lt 1 ]
 then
@@ -38,17 +39,17 @@ if [ ! -e ${OUTDIR}/linux-stable/arch/${ARCH}/boot/Image ]; then
 
     # TODO: Add your kernel build steps here
     # Cleaning any .config files
-    make ARCH=arm64 CROSS_COMPILE=${CROSS_COMPILE}- mrproper
+    make ARCH=arm64 CROSS_COMPILE=${CROSS_COMPILE} mrproper
     
     # Specifying defconfig
-    make ARCH=arm64 CROSS_COMPILE=${CROSS_COMPILE}- defconfig
+    make ARCH=arm64 CROSS_COMPILE=${CROSS_COMPILE} defconfig
     
     # QEMU kernel build vmlinux
-    make -j4 ARCH=arm64 CROSS_COMPILE=${CROSS_COMPILE}- all
+    make -j12 ARCH=arm64 CROSS_COMPILE=${CROSS_COMPILE} all
     
     # Adding kernel modules and devicetree
-    make ARCH=arm64 CROSS_COMPILE=${CROSS_COMPILE}- modules
-    make ARCH=arm64 CROSS_COMPILE=${CROSS_COMPILE}- dtbs
+    make ARCH=arm64 CROSS_COMPILE=${CROSS_COMPILE} modules
+    make ARCH=arm64 CROSS_COMPILE=${CROSS_COMPILE} dtbs
     echo "Checkpoint 2" 
 fi
 
@@ -104,10 +105,10 @@ echo "Library dependencies"
 ${CROSS_COMPILE}readelf -a ./rootfs/bin/busybox | grep "program interpreter"
 ${CROSS_COMPILE}readelf -a ./rootfs/bin/busybox | grep "Shared library"
 
-cp /home/bhakti/Downloads/arm-gnu-toolchain-13.3.rel1-x86_64-aarch64-none-linux-gnu/aarch64-none-linux-gnu/libc/lib/ld-linux-aarch64.so.1 ${OUTDIR}/rootfs/lib
-cp /home/bhakti/Downloads/arm-gnu-toolchain-13.3.rel1-x86_64-aarch64-none-linux-gnu/aarch64-none-linux-gnu/libc/lib64/libm.so.6 ${OUTDIR}/rootfs/lib64/
-cp /home/bhakti/Downloads/arm-gnu-toolchain-13.3.rel1-x86_64-aarch64-none-linux-gnu/aarch64-none-linux-gnu/libc/lib64/libresolv.so.2 ${OUTDIR}/rootfs/lib64/
-cp /home/bhakti/Downloads/arm-gnu-toolchain-13.3.rel1-x86_64-aarch64-none-linux-gnu/aarch64-none-linux-gnu/libc/lib64/libc.so.6 ${OUTDIR}/rootfs/lib64/
+cp ${LIBC_PATH}/lib/ld-linux-aarch64.so.1 ${OUTDIR}/rootfs/lib
+cp ${LIBC_PATH}/lib64/libm.so.6 ${OUTDIR}/rootfs/lib64/
+cp ${LIBC_PATH}/lib64/libresolv.so.2 ${OUTDIR}/rootfs/lib64/
+cp ${LIBC_PATH}/lib64/libc.so.6 ${OUTDIR}/rootfs/lib64/
 
 #TODO: Add library dependencies to rootfs
 
@@ -130,7 +131,7 @@ echo "Noed Added"
 
 # TODO: Clean and build the writer utility
 # Go to finder app directory
-cd /home/bhakti/Work/assignments-3-and-later-BhaktiRamani/finder-app
+cd ${FINDER_APP_DIR}
 make clean
 make CROSS_COMPILE=${CROSS_COMPILE}
 

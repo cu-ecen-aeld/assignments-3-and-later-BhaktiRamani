@@ -17,7 +17,7 @@
 
 CC = $(CROSS_COMPILE)gcc
 
-FILE_RESULT_PATH=/home/bhakti/Work/assignments-3-and-later-BhaktiRamani/assignments/assignment2/fieresult.txt
+FILE_RESULT_PATH=/home/bakri/Work/1_CU_Boulder/AESD/assignments-3-and-later-BhaktiRamani/assignments/assignment2/fileresult.txt
 
 # Source and target files
 
