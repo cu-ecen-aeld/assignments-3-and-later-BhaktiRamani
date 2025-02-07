@@ -31,8 +31,6 @@ void* threadfunc(void* thread_param)
 
     // Alternate option - usleep(thread_func_args->wait_to_obtain_ms * 1000);
 
-   //Initializing mutex
-    pthread_mutex_init(thread_func_args->mutex, NULL);
 
     // Obtained mutex
     if(pthread_mutex_lock(thread_func_args->mutex)!=0)
@@ -52,7 +50,7 @@ void* threadfunc(void* thread_param)
     // Release mutex
     if(pthread_mutex_unlock(thread_func_args -> mutex)!=0)
     {
-        ERROR_LOG("Failed to lock mutex");
+        ERROR_LOG("Failed to unlock mutex");
         thread_func_args->thread_complete_success = false;
         return thread_param;
     } 
