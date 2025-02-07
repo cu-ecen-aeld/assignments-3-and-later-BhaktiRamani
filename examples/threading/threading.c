@@ -21,6 +21,7 @@ void* threadfunc(void* thread_param)
     char command1[100];
     snprintf(command1, sizeof(command1), "./sleep.sh %d", wait_to_obtain_ms);
     int delay1 = system(command1);
+    (void)delay1;
 
     // Alternate option - usleep(thread_func_args->wait_to_obtain_ms * 1000);
 
@@ -40,6 +41,7 @@ void* threadfunc(void* thread_param)
     char command2[100];
     snprintf(command2, sizeof(command2), "./sleep.sh %d", wait_to_release_ms);
     int delay2 = system(command2);
+    (void)delay2;
 
     // Release mutex
     if(pthread_mutex_unlock(thread_func_args -> mutex)!=0)
