@@ -31,7 +31,6 @@ void* threadfunc(void* thread_param)
 
     // Alternate option - usleep(thread_func_args->wait_to_obtain_ms * 1000);
 
-
     // Obtained mutex
     if(pthread_mutex_lock(thread_func_args->mutex)!=0)
     {
