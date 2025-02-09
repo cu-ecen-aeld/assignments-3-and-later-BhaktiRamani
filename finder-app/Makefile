@@ -30,12 +30,12 @@ LDFLAGS =
 
 # Build Targets
 all : $(TARGET)
-	cd $(FILE_RESULT_PATH)
-	@touch ./fileresult.txt
-	@echo "Current tool chain : $(CC)" > fileresult.txt
+	#cd $(FILE_RESULT_PATH)
+	#@touch ./fileresult.txt
+	#@echo "Current tool chain : $(CC)" > fileresult.txt
 	#@touch ./$(TARGET) >> $(FILE_RESULT_PATH)
-	@if [ "$(CROSS_COMPILE)" = "aarch64-none-linux-gnu-" ]; then \
-	echo "Cross Compilation Successfull" >> fileresult.txt; \
+	#@if [ "$(CROSS_COMPILE)" = "aarch64-none-linux-gnu-" ]; then \
+	#echo "Cross Compilation Successfull" >> fileresult.txt; \
 	echo "Cross Compilation Successfull";\
     	fi
         	
