@@ -37,7 +37,7 @@ all : $(TARGET)
 	#@if [ "$(CROSS_COMPILE)" = "aarch64-none-linux-gnu-" ]; then \
 	#echo "Cross Compilation Successfull" >> fileresult.txt; \
 	echo "Cross Compilation Successfull";\
-    	fi
+    	#fi
         	
 	
 
