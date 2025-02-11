@@ -17,7 +17,7 @@
 
 CC = $(CROSS_COMPILE)gcc
 
-FILE_RESULT_PATH=/home/bhakti/Work/assignments-3-and-later-BhaktiRamani/assignments/assignment2/fieresult.txt
+FILE_RESULT_PATH=/home/bakri/Work/1_CU_Boulder/AESD/assignments-3-and-later-BhaktiRamani/assignments/assignment2/
 
 # Source and target files
 
@@ -30,12 +30,14 @@ LDFLAGS =
 
 # Build Targets
 all : $(TARGET)
-	@echo "Current tool chain : $(CC)" > $(FILE_RESULT_PATH)
-	@file ./$(TARGET) >> $(FILE_RESULT_PATH)
-	@if [ "$(CROSS_COMPILE)" = "aarch64-none-linux-gnu-" ]; then \
-	echo "Cross Compilation Successfull" >> $(FILE_RESULT_PATH); \
+	#cd $(FILE_RESULT_PATH)
+	#@touch ./fileresult.txt
+	#@echo "Current tool chain : $(CC)" > fileresult.txt
+	#@touch ./$(TARGET) >> $(FILE_RESULT_PATH)
+	#@if [ "$(CROSS_COMPILE)" = "aarch64-none-linux-gnu-" ]; then \
+	#echo "Cross Compilation Successfull" >> fileresult.txt; \
 	echo "Cross Compilation Successfull";\
-    	fi
+    	#fi
         	
 	
 

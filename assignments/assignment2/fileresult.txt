@@ -1,3 +1,2 @@
-Current tool chain : aarch64-none-linux-gnu-gcc
-./writer: ELF 64-bit LSB executable, ARM aarch64, version 1 (SYSV), dynamically linked, interpreter /lib/ld-linux-aarch64.so.1, for GNU/Linux 3.7.0, with debug_info, not stripped
-Cross Compilation Successfull
+Current tool chain : /home/bakri/Work/1_CU_Boulder/AESD/assignment-4-BhaktiRamani/buildroot/output/host/bin/aarch64-buildroot-linux-gnu-gcc
+./writer: ELF 64-bit LSB pie executable, ARM aarch64, version 1 (SYSV), dynamically linked, interpreter /lib/ld-linux-aarch64.so.1, for GNU/Linux 6.1.0, not stripped
