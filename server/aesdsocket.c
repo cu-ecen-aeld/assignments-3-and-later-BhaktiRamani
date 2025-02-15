@@ -111,15 +111,21 @@ void signal_handler(int signo)
 
 void reg_signal_handler(void)
 {
-    if (signal(SIGINT, signal_handler) == SIG_ERR)
-    {
-        syslog(LOG_ERR, "ERROR : reg_signal_handler sigterm");
+        struct sigaction sighandle;
+    //Initialize sigaction
+    sighandle.sa_handler = signal_handler;
+    sigemptyset(&sighandle.sa_mask);  // Initialize the signal set to empty
+    sighandle.sa_flags = 0;            // No special flags
+
+    // Catch SIGINT
+    if (sigaction(SIGINT, &sighandle, NULL) == -1) {
+        syslog(LOG_ERR, "Error setting up signal handler SIGINT: %s \n", strerror(errno));
     }
-    if (signal(SIGTERM, signal_handler) == SIG_ERR)
-    {
-        syslog(LOG_ERR, "ERROR : reg_signal_handler sigterm");
-    }
-    syslog(LOG_INFO, "reg_signal handler successfull");
+
+    // Catch SIGTERM
+    if (sigaction(SIGTERM, &sighandle, NULL) == -1) {
+        syslog(LOG_ERR, "Error setting up signal handler SIGINT: %s \n", strerror(errno));
+     }
 }
 
 int send_rcv_socket_data(int client_fd, int file_fd)
@@ -185,7 +191,7 @@ int send_rcv_socket_data(int client_fd, int file_fd)
     }
 
     // Reset file position to beginning before writing
-    if (lseek(file_fd, 0, SEEK_END) == -1)
+    if (lseek(file_fd, 0, SEEK_SET) == -1)
     {
         perror("[-] lseek");
         syslog(LOG_ERR, "ERROR: lseek failed: %s", strerror(errno));
@@ -193,7 +199,7 @@ int send_rcv_socket_data(int client_fd, int file_fd)
         return -1;
     }
 
-    // Truncate the file to ensure clean write
+    //Truncate the file to ensure clean write
     // if (ftruncate(file_fd, 0) == -1)
     // {
     //     perror("[-] ftruncate");
@@ -224,67 +230,6 @@ int send_rcv_socket_data(int client_fd, int file_fd)
     free(client_buffer);
     return 0;
 }
-// int send_rcv_socket_data(int client_fd, int file_fd)
-// {
-//     char *client_buffer = NULL;
-//     size_t total_received = 0;
-//     size_t current_size = CLIENT_BUFFER_LEN;
-//     size_t multiplication_factor = 1;
-
-//     // Alloc buffer using calloc
-//     client_buffer = (char *)calloc(current_size, sizeof(char));
-//     if(client_buffer == NULL)
-//     {
-//         syslog(LOG_ERR, "ERROR : Client Buffer Allocation failed");
-//         return -1;
-//     }
-
-//     while(true)
-//     {
-//         // Receive data from client
-//         ssize_t received_no_of_bytes = recv(client_fd, client_buffer + total_received, current_size - total_received - 1, 0);
-//         if (received_no_of_bytes <= 0) {
-//             break; // Connection closed or error
-//         }
-//         total_received += received_no_of_bytes;
-//         client_buffer[total_received] = '\0'; // Null-terminate the string
-
-//         // Check for newline
-//         if (strchr(client_buffer, '\n') != NULL) {
-//             break; // Newline found, exit the loop
-//         }
-
-//         // If we reach this point, we need to resize the buffer
-//         multiplication_factor <<= 1;
-//         size_t new_size = multiplication_factor * CLIENT_BUFFER_LEN;
-//         char *new_buffer = (char *)realloc(client_buffer, new_size);
-//         if (new_buffer == NULL) {
-//             syslog(LOG_ERR, "Reallocation of client buffer failed, returning with error");
-//             free(client_buffer);
-//             return -1;
-//         }
-//         client_buffer = new_buffer;
-//         current_size = new_size;
-//     }
-
-//     // Now we have the complete data, store it in the file
-//     syslog(LOG_INFO, "Writing received data to the sockedata file");
-//     if(write(file_fd, client_buffer, total_received)!=-1)
-//     {
-//         syslog(LOG_INFO, "Syncing data to the disk");
-//         fdatasync(file_fd);
-//     }
-//     else
-//     {
-//         syslog(LOG_ERR, "Writing received data to the socketdata file failed");
-//         free(client_buffer);
-//         return -1;
-//     }
-
-//     free(client_buffer);
-//     return 0; // Return suc
-
-// }
 
 int return_socketdata_to_client(int client_fd, int file_fd)
 {
@@ -331,7 +276,22 @@ int return_socketdata_to_client(int client_fd, int file_fd)
 int main(int argc, char **argv)
 {
 
+    const char *dir_path = "/var/tmp/";
+    const char *file_name = "aesdsocketdata";
+
+    // Construct full file path
+    char full_path[512]; // Make sure buffer is large enough
+    snprintf(full_path, sizeof(full_path), "%s/%s", dir_path, file_name);
+
+    // Attempt to delete the file
+    if (remove(full_path) == 0) {
+        printf("File '%s' deleted successfully.\n", full_path);
+    } else {
+        perror("Error deleting file");
+    }
+
     bool daemon_mode = false;
+
     // Check if the application to be run in daemon mode
     if ((argc >= 2) && (strcmp(argv[1], "-d") == 0))
     {
@@ -339,10 +299,9 @@ int main(int argc, char **argv)
     }
 
     // Open log - need change
-    openlog("aesdsocket", 0, LOG_USER | LOG_PID);
+    openlog("aesdsocket", LOG_PID | LOG_CONS | LOG_PERROR, LOG_USER);
 
-    // register signal handlers
-    // reg_signal_handler();
+
 
     // Create a Socket
     sockfd = socket(AF_INET, SOCK_STREAM, 0);
@@ -368,11 +327,10 @@ int main(int argc, char **argv)
     if (getaddrinfo(NULL, PORT, &hints, &serverInfo) != 0)
     {
         syslog(LOG_ERR, "ERROR : getaddrinfo operation fail, can't get socket address");
-        if (serverInfo != NULL)
-        {
-            freeaddrinfo(serverInfo);
-        }
-
+   
+        freeaddrinfo(serverInfo);
+       
+     
         clean();
     }
     printf("[+] Getaddr successfull \n");
@@ -424,6 +382,7 @@ int main(int argc, char **argv)
     printf("[+] Listening on port 9000 \n");
     syslog(LOG_INFO, "Listeing successfully");
 
+
     file_fd = open(SOCKET_FILE, O_RDWR | O_APPEND | O_CREAT, 0666);
     if (file_fd == -1)
     {
@@ -433,6 +392,8 @@ int main(int argc, char **argv)
         clean();
     }
 
+        // register signal handlers
+    reg_signal_handler();
     struct sockaddr_storage client_addr;
     socklen_t client_addr_size = sizeof(client_addr);
       
@@ -464,6 +425,9 @@ int main(int argc, char **argv)
         syslog(LOG_INFO, "Accepted connection from %s", client_ip);
         printf("[+] accepted client ip: %s\n", client_ip);
 
+
+
+
         // Receive packets from the client and store in SOCKETDATA_FILE
         if (send_rcv_socket_data(client_fd, file_fd) == 0)
         {
@@ -472,5 +436,7 @@ int main(int argc, char **argv)
         }
 
         close(client_fd);
+  
+        
     }
 }
