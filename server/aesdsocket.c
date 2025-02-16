@@ -436,7 +436,8 @@ int main(int argc, char **argv)
         }
 
         close(client_fd);
-  
+     
         
     }
+    freeaddrinfo(serverInfo);
 }
