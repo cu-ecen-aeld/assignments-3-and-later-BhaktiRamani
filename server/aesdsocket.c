@@ -276,19 +276,19 @@ int return_socketdata_to_client(int client_fd, int file_fd)
 int main(int argc, char **argv)
 {
 
-    // const char *dir_path = "/var/tmp/";
-    // const char *file_name = "aesdsocketdata";
+    const char *dir_path = "/var/tmp/";
+    const char *file_name = "aesdsocketdata";
 
-    // // Construct full file path
-    // char full_path[512]; // Make sure buffer is large enough
-    // snprintf(full_path, sizeof(full_path), "%s/%s", dir_path, file_name);
+    // Construct full file path
+    char full_path[512]; // Make sure buffer is large enough
+    snprintf(full_path, sizeof(full_path), "%s/%s", dir_path, file_name);
 
-    // // Attempt to delete the file
-    // if (remove(full_path) == 0) {
-    //     printf("File '%s' deleted successfully.\n", full_path);
-    // } else {
-    //     perror("Error deleting file");
-    // }
+    // Attempt to delete the file
+    if (remove(full_path) == 0) {
+        printf("File '%s' deleted successfully.\n", full_path);
+    } else {
+        perror("Error deleting file");
+    }
 
     bool daemon_mode = false;
 
