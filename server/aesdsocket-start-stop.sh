@@ -1,6 +1,5 @@
 #! /bin/sh
 
-
 if [ -z "$1" ]; then
     echo "usage: $0 {start|stop}"
     exit 1
@@ -9,7 +8,7 @@ fi
 case "$1" in
     start)
         echo "Starting aesdsocketserver"
-        start-stop-daemon -S -n aesdsocket -a /usr/bin/aesdsocket
+        start-stop-daemon -S -n aesdsocket -a /usr/bin/aesdsocket -- -d
         if [ $? -eq 0 ]; then
             echo "aesdsocketserver started successfully."
         else
