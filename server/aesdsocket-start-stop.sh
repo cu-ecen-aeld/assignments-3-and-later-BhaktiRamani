@@ -18,7 +18,7 @@ case "$1" in
         ;;
     stop)
         echo "Stopping aesdsocketserver"
-        start-stop-daemon -K -n aesdsocketserver
+        start-stop-daemon -K -n aesdsocket
         if [ $? -eq 0 ]; then
             echo "aesdsocketserver stopped successfully."
         else
