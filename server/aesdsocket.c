@@ -104,16 +104,14 @@ void signal_handler(int signo)
     if ((signo == SIGINT) || (signo == SIGTERM))
     {
         exit_flag = true;
-        clean();
         syslog(LOG_DEBUG, "Caught signal, exiting");
-        
+        // some clean up
     }
 }
 
 void reg_signal_handler(void)
 {
-    struct sigaction sighandle;
-
+        struct sigaction sighandle;
     //Initialize sigaction
     sighandle.sa_handler = signal_handler;
     sigemptyset(&sighandle.sa_mask);  // Initialize the signal set to empty
@@ -192,14 +190,14 @@ int send_rcv_socket_data(int client_fd, int file_fd)
         }
     }
 
-    // Reset file position to beginning before writing
-    if (lseek(file_fd, 0, SEEK_SET) == -1)
-    {
-        perror("[-] lseek");
-        syslog(LOG_ERR, "ERROR: lseek failed: %s", strerror(errno));
-        free(client_buffer);
-        return -1;
-    }
+    // // Reset file position to beginning before writing
+    // if (lseek(file_fd, 0, SEEK_SET) == -1)
+    // {
+    //     perror("[-] lseek");
+    //     syslog(LOG_ERR, "ERROR: lseek failed: %s", strerror(errno));
+    //     free(client_buffer);
+    //     return -1;
+    // }
 
     //Truncate the file to ensure clean write
     // if (ftruncate(file_fd, 0) == -1)
@@ -239,7 +237,13 @@ int return_socketdata_to_client(int client_fd, int file_fd)
     ssize_t bytes_read;
 
     // Reset file position to start
-    lseek(file_fd, 0, SEEK_SET);
+    // Reset file position to start - keep this!
+    if (lseek(file_fd, 0, SEEK_SET) == -1) {
+        perror("[-] lseek");
+        syslog(LOG_ERR, "ERROR: lseek failed: %s", strerror(errno));
+     
+        return -1;
+    }
 
     send_buffer = (char *)malloc(CLIENT_BUFFER_LEN);
     if (send_buffer == NULL)
@@ -278,19 +282,19 @@ int return_socketdata_to_client(int client_fd, int file_fd)
 int main(int argc, char **argv)
 {
 
-    const char *dir_path = "/var/tmp/";
-    const char *file_name = "aesdsocketdata";
+    // const char *dir_path = "/var/tmp/";
+    // const char *file_name = "aesdsocketdata";
 
-    // Construct full file path
-    char full_path[512]; // Make sure buffer is large enough
-    snprintf(full_path, sizeof(full_path), "%s/%s", dir_path, file_name);
+    // // Construct full file path
+    // char full_path[512]; // Make sure buffer is large enough
+    // snprintf(full_path, sizeof(full_path), "%s/%s", dir_path, file_name);
 
-    // Attempt to delete the file
-    if (remove(full_path) == 0) {
-        printf("File '%s' deleted successfully.\n", full_path);
-    } else {
-        perror("Error deleting file");
-    }
+    // // Attempt to delete the file
+    // if (remove(full_path) == 0) {
+    //     printf("File '%s' deleted successfully.\n", full_path);
+    // } else {
+    //     perror("Error deleting file");
+    // }
 
     bool daemon_mode = false;
 
