@@ -104,14 +104,16 @@ void signal_handler(int signo)
     if ((signo == SIGINT) || (signo == SIGTERM))
     {
         exit_flag = true;
+        clean();
         syslog(LOG_DEBUG, "Caught signal, exiting");
-        // some clean up
+        
     }
 }
 
 void reg_signal_handler(void)
 {
-        struct sigaction sighandle;
+    struct sigaction sighandle;
+
     //Initialize sigaction
     sighandle.sa_handler = signal_handler;
     sigemptyset(&sighandle.sa_mask);  // Initialize the signal set to empty
