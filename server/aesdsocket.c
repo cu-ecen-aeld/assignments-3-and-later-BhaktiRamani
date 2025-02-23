@@ -94,10 +94,11 @@ void clean()
 {
     close(sockfd);
     close(client_fd);
+    ftruncate(file_fd, 0);
     close(file_fd);
     closelog();
     syslog(LOG_INFO, "Cleaning and Closing");
-    exit(1);
+    exit(0);
 }
 void signal_handler(int signo)
 {
