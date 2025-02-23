@@ -95,7 +95,9 @@ void clean()
     close(sockfd);
     close(client_fd);
     ftruncate(file_fd, 0);
+
     close(file_fd);
+    
     closelog();
     syslog(LOG_INFO, "Cleaning and Closing");
     exit(0);
@@ -129,6 +131,8 @@ void reg_signal_handler(void)
      }
 }
 
+
+// count
 int send_rcv_socket_data(int client_fd, int file_fd)
 {
     char *client_buffer = NULL;
@@ -191,14 +195,14 @@ int send_rcv_socket_data(int client_fd, int file_fd)
         }
     }
 
-    // // Reset file position to beginning before writing
-    // if (lseek(file_fd, 0, SEEK_SET) == -1)
-    // {
-    //     perror("[-] lseek");
-    //     syslog(LOG_ERR, "ERROR: lseek failed: %s", strerror(errno));
-    //     free(client_buffer);
-    //     return -1;
-    // }
+    // Reset file position to beginning before writing
+    if (lseek(file_fd, 0, SEEK_SET) == -1)
+    {
+        perror("[-] lseek");
+        syslog(LOG_ERR, "ERROR: lseek failed: %s", strerror(errno));
+        free(client_buffer);
+        return -1;
+    }
 
     //Truncate the file to ensure clean write
     // if (ftruncate(file_fd, 0) == -1)
@@ -229,7 +233,7 @@ int send_rcv_socket_data(int client_fd, int file_fd)
     }
 
     free(client_buffer);
-    return 0;
+    return written;
 }
 
 int return_socketdata_to_client(int client_fd, int file_fd)
@@ -238,13 +242,7 @@ int return_socketdata_to_client(int client_fd, int file_fd)
     ssize_t bytes_read;
 
     // Reset file position to start
-    // Reset file position to start - keep this!
-    if (lseek(file_fd, 0, SEEK_SET) == -1) {
-        perror("[-] lseek");
-        syslog(LOG_ERR, "ERROR: lseek failed: %s", strerror(errno));
-     
-        return -1;
-    }
+    lseek(file_fd, 0, SEEK_SET);
 
     send_buffer = (char *)malloc(CLIENT_BUFFER_LEN);
     if (send_buffer == NULL)
@@ -397,16 +395,21 @@ int main(int argc, char **argv)
         syslog(LOG_ERR, "ERROR : Generation of /var/tmp/aesdsocketdata failed");
         freeaddrinfo(serverInfo);
         clean();
+        exit(0);
     }
 
-        // register signal handlers
+    // register signal handlers
     reg_signal_handler();
     struct sockaddr_storage client_addr;
     socklen_t client_addr_size = sizeof(client_addr);
-      
+    
+    // file_fd = open(SOCKET_FILE, O_RDWR | O_APPEND | O_CREAT, 0666);
+    // lseek(file_fd, 0, SEEK_SET);
 
     while (!exit_flag)
     {
+       
+
         client_fd = accept(sockfd, (struct sockaddr *)&client_addr, &client_addr_size);
         if ((client_fd) == -1)
         {
@@ -432,17 +435,19 @@ int main(int argc, char **argv)
         syslog(LOG_INFO, "Accepted connection from %s", client_ip);
         printf("[+] accepted client ip: %s\n", client_ip);
 
-
+        int written_bytes;
         // Receive packets from the client and store in SOCKETDATA_FILE
-        if (send_rcv_socket_data(client_fd, file_fd) == 0)
+        if ((written_bytes = send_rcv_socket_data(client_fd, file_fd)) > 0)
         {
             // Send back the stored data of file back to the client
             return_socketdata_to_client(client_fd, file_fd);
         }
 
-        close(client_fd);
-     
+        
         
     }
+    
+    clean();
     freeaddrinfo(serverInfo);
 }
+
