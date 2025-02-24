@@ -1,3 +1,22 @@
+/*******************************************************************************
+* @file       aesdsocket.c
+* @brief      A socket server implementation that handles client connections,
+*             stores received data, and sends it back to clients
+*
+* This program creates a socket server that:
+* - Listens on port 9000 for incoming connections
+* - Accepts client connections and receives data
+* - Stores received data in /var/tmp/aesdsocketdata
+* - Sends accumulated data back to connected clients
+* - Supports daemon mode with -d argument
+* - Handles SIGTERM and SIGINT signals gracefully
+*
+* @author     Bhakti Ramani
+* @date       Feb 23 2025
+* @version    1.0
+* @copyright  Copyright (c) Bhakti Ramani, All Rights Reserved
+*******************************************************************************/
+
 #include <stdio.h>
 #include <sys/socket.h>
 #include <sys/types.h>
@@ -13,13 +32,35 @@
 #include <fcntl.h>
 #include <sys/stat.h>
 
+// for personal debug statements
+// For personal debug statements
+#define DEBUG 0 
+#if DEBUG == 1
+#define LOG perror 
+#else
+#define LOG(...) do {} while (0)
+#endif
+
+/* Global variables */
+bool exit_flag = false;
+int sockfd, client_fd, file_fd;
+
+/* Constants */
 #define PORT "9000"
 #define SOCKET_FILE "/var/tmp/aesdsocketdata"
 #define CLIENT_BUFFER_LEN 1024
 
-bool exit_flag = false;
-int sockfd, client_fd, file_fd;
-
+/**
+ * @brief Creates a daemon process
+ *
+ * Performs the standard Unix daemon creation process:
+ * 1. Forks and exits parent
+ * 2. Creates new session
+ * 3. Changes working directory to root
+ * 4. Redirects standard file descriptors to /dev/null
+ *
+ * @return true if daemon creation successful, false otherwise
+ */
 bool create_daemon()
 {
     pid_t pid;
@@ -29,7 +70,7 @@ bool create_daemon()
 
     if (pid < 0)
     {
-        syslog(LOG_ERR, "Fork failed");
+        syslog(LOG_ERR, "Fork failed for Daemon");
         return status;
     }
 
@@ -42,14 +83,14 @@ bool create_daemon()
     // create new group and session
     if (setsid() < 0)
     {
-        syslog(LOG_ERR, "Create new session  failed");
+        syslog(LOG_ERR, "New Session Creation failed for Daemon");
         return status;
     }
 
     // Change the working directory to "/"
     if (chdir("/") == -1)
     {
-        syslog(LOG_ERR, "Changing working directory failed");
+        syslog(LOG_ERR, "Changing working directory failed for Daemon");
         return status;
     }
     // Since no files were open in parent, no fds are closed here
@@ -57,14 +98,14 @@ bool create_daemon()
     dev_null_fd = open("/dev/null", O_RDWR);
     if (dev_null_fd == -1)
     {
-        perror("Failed to open /dev/null");
+        LOG("Failed to open /dev/null");
         return status;
     }
 
     // Redirect stdin (fd 0) to /dev/null
     if (dup2(dev_null_fd, STDIN_FILENO) == -1)
     {
-        perror("Failed to redirect stdin");
+        LOG("Failed to redirect stdin");
         close(dev_null_fd);
         return status;
     }
@@ -72,7 +113,7 @@ bool create_daemon()
     // Redirect stdout (fd 1) to /dev/null
     if (dup2(dev_null_fd, STDOUT_FILENO) == -1)
     {
-        perror("Failed to redirect stdout");
+        LOG("Failed to redirect stdout");
         close(dev_null_fd);
         return status;
     }
@@ -80,7 +121,7 @@ bool create_daemon()
     // Redirect stderr (fd 2) to /dev/null
     if (dup2(dev_null_fd, STDERR_FILENO) == -1)
     {
-        perror("Failed to redirect stderr");
+        LOG("Failed to redirect stderr");
         close(dev_null_fd);
         return status;
     }
@@ -90,31 +131,49 @@ bool create_daemon()
     return true;
 }
 
+/**
+ * @brief Cleans up resources before program exit
+ *
+ * Closes all open file descriptors, truncates and removes the socket data file,
+ * closes syslog, and performs other necessary cleanup operations
+ */
 void clean()
 {
     close(sockfd);
     close(client_fd);
     ftruncate(file_fd, 0);
-
     close(file_fd);
-    
     closelog();
-    syslog(LOG_INFO, "Cleaning and Closing");
+    syslog(LOG_INFO, "Cleaning and Closing the aesdsocket");
     exit(0);
 }
+
+/**
+ * @brief Signal handler for SIGTERM and SIGINT
+ *
+ * Sets the exit flag to true when either SIGTERM or SIGINT is received,
+ * allowing for graceful program termination
+ *
+ * @param signo The signal number received
+ */
 void signal_handler(int signo)
 {
     if ((signo == SIGINT) || (signo == SIGTERM))
     {
         exit_flag = true;
         syslog(LOG_DEBUG, "Caught signal, exiting");
-        // some clean up
+        
     }
 }
 
+/**
+ * @brief Registers signal handlers for SIGTERM and SIGINT
+ *
+ * Sets up signal handling using sigaction for proper signal management
+ */
 void reg_signal_handler(void)
 {
-        struct sigaction sighandle;
+    struct sigaction sighandle;
     //Initialize sigaction
     sighandle.sa_handler = signal_handler;
     sigemptyset(&sighandle.sa_mask);  // Initialize the signal set to empty
@@ -131,8 +190,17 @@ void reg_signal_handler(void)
      }
 }
 
-
-// count
+/**
+ * @brief Receives data from client and writes to file
+ *
+ * Receives data from the client socket until a newline is found,
+ * dynamically resizing the buffer as needed. Writes received data
+ * to the specified file descriptor.
+ *
+ * @param client_fd The client socket file descriptor
+ * @param file_fd The file descriptor to write data to
+ * @return Number of bytes written on success, -1 on failure
+ */
 int send_rcv_socket_data(int client_fd, int file_fd)
 {
     char *client_buffer = NULL;
@@ -143,7 +211,7 @@ int send_rcv_socket_data(int client_fd, int file_fd)
     client_buffer = (char *)calloc(current_size, sizeof(char));
     if (client_buffer == NULL)
     {
-        perror("[-] calloc");
+        LOG("[-] calloc");
         syslog(LOG_ERR, "ERROR: Client Buffer Allocation failed");
         return -1;
     }
@@ -162,7 +230,7 @@ int send_rcv_socket_data(int client_fd, int file_fd)
             }
             else
             {
-                perror("[-] recv");
+                LOG("[-] recv");
                 syslog(LOG_ERR, "recv failed: %s", strerror(errno));
             }
             free(client_buffer);
@@ -185,7 +253,7 @@ int send_rcv_socket_data(int client_fd, int file_fd)
             char *new_buffer = realloc(client_buffer, new_size);
             if (new_buffer == NULL)
             {
-                perror("[-] realloc");
+                LOG("[-] realloc");
                 syslog(LOG_ERR, "ERROR: Buffer reallocation failed");
                 free(client_buffer);
                 return -1;
@@ -198,35 +266,27 @@ int send_rcv_socket_data(int client_fd, int file_fd)
     // Reset file position to beginning before writing
     if (lseek(file_fd, 0, SEEK_SET) == -1)
     {
-        perror("[-] lseek");
+        LOG("[-] lseek");
         syslog(LOG_ERR, "ERROR: lseek failed: %s", strerror(errno));
         free(client_buffer);
         return -1;
     }
 
-    //Truncate the file to ensure clean write
-    // if (ftruncate(file_fd, 0) == -1)
-    // {
-    //     perror("[-] ftruncate");
-    //     syslog(LOG_ERR, "ERROR: ftruncate failed: %s", strerror(errno));
-    //     free(client_buffer);
-    //     return -1;
-    // }
 
     // Write data to file
     ssize_t written = write(file_fd, client_buffer, total_received);
     if (written == -1 || written != total_received)
     {
-        perror("[-] write");
+        LOG("[-] write");
         syslog(LOG_ERR, "ERROR: File write failed: %s", strerror(errno));
         free(client_buffer);
         return -1;
     }
-    printf("[+] Written %ld bytes \n", total_received);
+    //printf("[+] Written %ld bytes \n", total_received);
     // Ensure data is written to disk
     if (fdatasync(file_fd) == -1)
     {
-        perror("[-] fdatasync");
+        LOG("[-] fdatasync");
         syslog(LOG_ERR, "ERROR: fdatasync failed: %s", strerror(errno));
         free(client_buffer);
         return -1;
@@ -236,6 +296,16 @@ int send_rcv_socket_data(int client_fd, int file_fd)
     return written;
 }
 
+/**
+ * @brief Sends file data back to client
+ *
+ * Reads data from the specified file and sends it back to the client
+ * in chunks. Handles partial sends and interruptions.
+ *
+ * @param client_fd The client socket file descriptor
+ * @param file_fd The file descriptor to read data from
+ * @return 0 on success, -1 on failure
+ */
 int return_socketdata_to_client(int client_fd, int file_fd)
 {
     char *send_buffer;
@@ -247,7 +317,7 @@ int return_socketdata_to_client(int client_fd, int file_fd)
     send_buffer = (char *)malloc(CLIENT_BUFFER_LEN);
     if (send_buffer == NULL)
     {
-        perror("[-] malloc");
+        LOG("[-] malloc");
         syslog(LOG_ERR, "ERROR : Client buffer Allocation failed");
         return -1;
     }
@@ -255,45 +325,38 @@ int return_socketdata_to_client(int client_fd, int file_fd)
     // Read and send data
     while ((bytes_read = read(file_fd, send_buffer, CLIENT_BUFFER_LEN - 1)) > 0)
     {
-        // ssize_t bytes_sent = 0;
-        // while (bytes_sent < bytes_read)
-        // {
+    
         ssize_t sent = send(client_fd, send_buffer, bytes_read, 0);
         if (sent == -1)
         {
             if (errno == EINTR)
                 continue;
-            perror("[-] send");
+            LOG("[-] send");
             syslog(LOG_ERR, "ERROR: Send to client failed: %s",
                     strerror(errno));
             free(send_buffer);
             return -1;
         }
-        printf("[+] Send %ld bytes \n", bytes_read);
-        // bytes_sent += sent;
-        // }
+        //printf("[+] Send %ld bytes \n", bytes_read);
+
     }
 
     free(send_buffer);
     return 0;
 }
 
+/**
+ * @brief Main program entry point
+ *
+ * Sets up the socket server, handles client connections, and manages
+ * the main program loop. Supports daemon mode with -d argument.
+ *
+ * @param argc Number of command line arguments
+ * @param argv Array of command line arguments
+ * @return 0 on success, non-zero on failure
+ */
 int main(int argc, char **argv)
 {
-
-    // const char *dir_path = "/var/tmp/";
-    // const char *file_name = "aesdsocketdata";
-
-    // // Construct full file path
-    // char full_path[512]; // Make sure buffer is large enough
-    // snprintf(full_path, sizeof(full_path), "%s/%s", dir_path, file_name);
-
-    // // Attempt to delete the file
-    // if (remove(full_path) == 0) {
-    //     printf("File '%s' deleted successfully.\n", full_path);
-    // } else {
-    //     perror("Error deleting file");
-    // }
 
     bool daemon_mode = false;
 
@@ -306,19 +369,17 @@ int main(int argc, char **argv)
     // Open log - need change
     openlog("aesdsocket", LOG_PID | LOG_CONS | LOG_PERROR, LOG_USER);
 
-
-
     // Create a Socket
     sockfd = socket(AF_INET, SOCK_STREAM, 0);
     if (sockfd == -1)
     {
-        perror("[-] Socket");
+        LOG("[-] Socket");
         syslog(LOG_ERR, "ERROR : Socket Generation Failed");
         // perror("Socket Generation Failed \n");
         clean();
     }
     syslog(LOG_INFO, "Socket Generation Successfull with sockfd : %d", sockfd);
-    printf("[+] Listening on port 9000 \n");
+    //printf("[+] Listening on port 9000 \n");
 
     // Bind - Assigning address to the socket
     struct addrinfo hints;
@@ -338,12 +399,12 @@ int main(int argc, char **argv)
      
         clean();
     }
-    printf("[+] Getaddr successfull \n");
+    //printf("[+] Getaddr successfull \n");
 
     syslog(LOG_INFO, "getaddrinfo successfull");
 
     
-    printf("[+] Getaddr successfull \n");
+    //printf("[+] Getaddr successfull \n");
 
     int yes = 1;
     socklen_t size = sizeof(yes);
@@ -351,7 +412,7 @@ int main(int argc, char **argv)
     // Bind
     if (bind(sockfd, serverInfo->ai_addr, serverInfo->ai_addrlen) != 0)
     {
-        perror("[-] bind \n");
+        LOG("[-] bind \n");
         syslog(LOG_ERR, "Bind Operation failed");
 
         // clearing the serverInfo
@@ -363,8 +424,8 @@ int main(int argc, char **argv)
         clean();
     }
 
-    syslog(LOG_INFO, "bind successfull");
-    printf("[+] Bind successfull \n");
+    syslog(LOG_INFO, "Bind successfull");
+    //printf("[+] Bind successfull \n");
 
     // Check if daemon to be created
     if (daemon_mode)
@@ -375,23 +436,22 @@ int main(int argc, char **argv)
             freeaddrinfo(serverInfo); // free the linked-list
             clean();
         }
-        printf("[+] Deamon created \n");
+        //printf("[+] Deamon created \n");
     }
 
     if (listen(sockfd, 20) == -1)
     {
         syslog(LOG_ERR, "ERROR : Can't Listen");
-
         clean();
     }
-    printf("[+] Listening on port 9000 \n");
+    //printf("[+] Listening on port 9000 \n");
     syslog(LOG_INFO, "Listeing successfully");
 
 
     file_fd = open(SOCKET_FILE, O_RDWR | O_APPEND | O_CREAT, 0666);
     if (file_fd == -1)
     {
-        perror("[-] open");
+        LOG("[-] open");
         syslog(LOG_ERR, "ERROR : Generation of /var/tmp/aesdsocketdata failed");
         freeaddrinfo(serverInfo);
         clean();
@@ -403,17 +463,13 @@ int main(int argc, char **argv)
     struct sockaddr_storage client_addr;
     socklen_t client_addr_size = sizeof(client_addr);
     
-    // file_fd = open(SOCKET_FILE, O_RDWR | O_APPEND | O_CREAT, 0666);
-    // lseek(file_fd, 0, SEEK_SET);
 
     while (!exit_flag)
     {
-       
-
         client_fd = accept(sockfd, (struct sockaddr *)&client_addr, &client_addr_size);
         if ((client_fd) == -1)
         {
-            perror("[-] accpet");
+            LOG("[-] accpet");
             syslog(LOG_ERR, "ERROR : client fd generation failed");
             continue;
         }
@@ -433,7 +489,7 @@ int main(int argc, char **argv)
 
         // Logging in the client ip
         syslog(LOG_INFO, "Accepted connection from %s", client_ip);
-        printf("[+] accepted client ip: %s\n", client_ip);
+        //printf("[+] accepted client ip: %s\n", client_ip);
 
         int written_bytes;
         // Receive packets from the client and store in SOCKETDATA_FILE
@@ -442,8 +498,6 @@ int main(int argc, char **argv)
             // Send back the stored data of file back to the client
             return_socketdata_to_client(client_fd, file_fd);
         }
-
-        
         
     }
     
