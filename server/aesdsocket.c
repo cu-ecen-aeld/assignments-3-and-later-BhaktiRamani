@@ -117,7 +117,7 @@ void thread_join()
 {
     thread_node* current = SLIST_FIRST(&head);
     thread_node *next = NULL; 
-    
+
     pthread_mutex_lock(&mutex_thread_LL);
     while(current != NULL)
     {
@@ -696,9 +696,9 @@ int main(int argc, char **argv)
         
     }
     thread_join();
-    if (pthread_join(timer, NULL) != 0) {
-        syslog(LOG_ERR, "Failed to join timer thread");
-    }
+    // if (pthread_join(timer, NULL) != 0) {
+    //     syslog(LOG_ERR, "Failed to join timer thread");
+    // }
     free(timer_t);
     freeaddrinfo(serverInfo);
     clean();
