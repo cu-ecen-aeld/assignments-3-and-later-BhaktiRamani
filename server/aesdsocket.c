@@ -31,7 +31,11 @@
 #include <unistd.h>
 #include <fcntl.h>
 #include <sys/stat.h>
+#include <stdlib.h>
+#include <pthread.h>
+#include <sys/queue.h>
 
+#pragma GCC diagnostic warning "-Wunused-variable"
 // for personal debug statements
 // For personal debug statements
 #define DEBUG 0 
@@ -49,6 +53,91 @@ int sockfd, client_fd, file_fd;
 #define PORT "9000"
 #define SOCKET_FILE "/var/tmp/aesdsocketdata"
 #define CLIENT_BUFFER_LEN 1024
+FILE *tmp_file = NULL;
+
+int send_rcv_socket_data(int client_fd, int file_fd);
+int return_socketdata_to_client(int client_fd, int file_fd);
+
+typedef struct thread_arg
+{
+    int client_fd;
+    int file_fd;
+    struct sockaddr_storage socket_addr;
+}thread_arg;
+
+typedef struct thread_node{
+    pthread_t threadId;
+    SLIST_ENTRY(thread_node ) entry;
+}thread_node;
+
+SLIST_HEAD(ThreadList, thread_node) head = SLIST_HEAD_INITIALIZER(head);
+
+pthread_mutex_t mutex_read_write = PTHREAD_MUTEX_INITIALIZER;
+
+pthread_mutex_t mutex_thread_LL = PTHREAD_MUTEX_INITIALIZER;
+
+void* thread_operation(void *args)
+{
+    thread_arg* thread_args = (thread_arg*)args;
+    int client_fd_t = thread_args->client_fd;
+    int file_fd_t = thread_args->file_fd;
+    // read write operation in files
+    int written_bytes;
+    // Receive packets from the client and store in SOCKETDATA_FILE
+    if ((written_bytes = send_rcv_socket_data(client_fd_t, file_fd_t)) > 0)
+    {
+        // Send back the stored data of file back to the client
+        return_socketdata_to_client(client_fd_t, file_fd_t);
+    }
+
+    // Clean up
+    close(client_fd_t);
+    free(thread_args);
+    return NULL;
+}
+
+void thread_node_add(pthread_t thread_id)
+{
+    thread_node* node = (thread_node*)malloc(sizeof(thread_node));
+    if(node == NULL)
+    {
+        printf("[-] Thread Node creation Failed \n");
+        syslog(LOG_INFO, "Thread node creation failed");
+        // some clean up        
+    }
+    node -> threadId = thread_id;
+    pthread_mutex_lock(&mutex_thread_LL);
+    syslog(LOG_INFO,"Inserting thread node");
+    SLIST_INSERT_HEAD(&head,node,entry);
+    pthread_mutex_unlock(&mutex_thread_LL);
+}
+
+void thread_join()
+{
+    thread_node* current = SLIST_FIRST(&head);
+    thread_node *next; 
+    pthread_mutex_lock(&mutex_thread_LL);
+    while(current != NULL)
+    {
+        printf("[+] Thread Id : %ld\n", current -> threadId);
+        printf("Current : %p , Next : %p \n", current, next);
+        next = SLIST_NEXT(current,entry);
+        
+        if(pthread_join(current -> threadId, NULL) == 0)
+        {
+            printf("[+] joining the thread and removing it from LL\n");
+            SLIST_REMOVE(&head,current,thread_node,entry);
+            free(current);
+         
+        }
+        else{
+            printf("[-] Thread join failed \n");
+        }
+        current = next;
+
+    }
+    pthread_mutex_unlock(&mutex_thread_LL);
+}
 
 /**
  * @brief Creates a daemon process
@@ -262,7 +351,7 @@ int send_rcv_socket_data(int client_fd, int file_fd)
             current_size = new_size;
         }
     }
-
+    pthread_mutex_lock(&mutex_read_write);
     // Reset file position to beginning before writing
     if (lseek(file_fd, 0, SEEK_SET) == -1)
     {
@@ -293,6 +382,7 @@ int send_rcv_socket_data(int client_fd, int file_fd)
     }
 
     free(client_buffer);
+    pthread_mutex_unlock(&mutex_read_write);
     return written;
 }
 
@@ -311,6 +401,7 @@ int return_socketdata_to_client(int client_fd, int file_fd)
     char *send_buffer;
     ssize_t bytes_read;
 
+    pthread_mutex_lock(&mutex_read_write);
     // Reset file position to start
     lseek(file_fd, 0, SEEK_SET);
 
@@ -322,6 +413,7 @@ int return_socketdata_to_client(int client_fd, int file_fd)
         return -1;
     }
 
+    
     // Read and send data
     while ((bytes_read = read(file_fd, send_buffer, CLIENT_BUFFER_LEN - 1)) > 0)
     {
@@ -342,6 +434,7 @@ int return_socketdata_to_client(int client_fd, int file_fd)
     }
 
     free(send_buffer);
+    pthread_mutex_unlock(&mutex_read_write);
     return 0;
 }
 
@@ -488,18 +581,54 @@ int main(int argc, char **argv)
         }
 
         // Logging in the client ip
+        printf("\n");
         syslog(LOG_INFO, "Accepted connection from %s", client_ip);
+       
         //printf("[+] accepted client ip: %s\n", client_ip);
 
-        int written_bytes;
-        // Receive packets from the client and store in SOCKETDATA_FILE
-        if ((written_bytes = send_rcv_socket_data(client_fd, file_fd)) > 0)
-        {
-            // Send back the stored data of file back to the client
-            return_socketdata_to_client(client_fd, file_fd);
+        // Creating a thread for accepted connection
+
+        thread_arg *t_args = malloc(sizeof(thread_arg));
+        if (!t_args) {
+            syslog(LOG_ERR, "Failed to allocate thread argument");
+            close(client_fd);
+            continue;
         }
+
+        t_args -> client_fd = client_fd;
+        t_args -> file_fd = file_fd;
+        t_args -> socket_addr = client_addr;
+
+        pthread_t thread_id;
+        syslog(LOG_INFO, "Creating a new thread");
+        int err = pthread_create(&thread_id, NULL, thread_operation, t_args);
+        if(err == 0)
+        {
+            printf("[+] Thread creation Successfull \n");
+        }
+        else{
+            printf("[-] Thread creation Failed \n");
+            syslog(LOG_ERR, "Error creating thread: %s", strerror(err));
+            free(t_args);
+            close(client_fd);
+            continue;           // because we are accepting connection infinite times and seperating it to      multiple         threads 
+
+        }
+
+        thread_node_add(thread_id);
+        thread_join();
+        
+
+        // int written_bytes;
+        // // Receive packets from the client and store in SOCKETDATA_FILE
+        // if ((written_bytes = send_rcv_socket_data(client_fd, file_fd)) > 0)
+        // {
+        //     // Send back the stored data of file back to the client
+        //     return_socketdata_to_client(client_fd, file_fd);
+        // }
         
     }
+    thread_join();
     
     clean();
     freeaddrinfo(serverInfo);
