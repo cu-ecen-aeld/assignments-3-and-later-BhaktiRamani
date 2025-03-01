@@ -34,8 +34,9 @@
 #include <stdlib.h>
 #include <pthread.h>
 #include <sys/queue.h>
+#include <time.h>
 
-#pragma GCC diagnostic warning "-Wunused-variable"
+
 // for personal debug statements
 // For personal debug statements
 #define DEBUG 0 
@@ -115,12 +116,12 @@ void thread_node_add(pthread_t thread_id)
 void thread_join()
 {
     thread_node* current = SLIST_FIRST(&head);
-    thread_node *next; 
+    thread_node *next = NULL; 
+    
     pthread_mutex_lock(&mutex_thread_LL);
     while(current != NULL)
     {
-        printf("[+] Thread Id : %ld\n", current -> threadId);
-        printf("Current : %p , Next : %p \n", current, next);
+  
         next = SLIST_NEXT(current,entry);
         
         if(pthread_join(current -> threadId, NULL) == 0)
@@ -139,6 +140,46 @@ void thread_join()
     pthread_mutex_unlock(&mutex_thread_LL);
 }
 
+void *timer_thread(void *args)
+{
+    thread_arg *arg = (thread_arg*)args;
+    time_t t;
+    struct tm *tmp;
+    char outstr[200];
+    while(!exit_flag)
+    {
+        sleep(10);
+        t = time(NULL);
+        tmp = localtime(&t);
+        if (tmp == NULL) {
+            perror("localtime");
+            exit(EXIT_FAILURE);
+        }
+
+        if(strftime(outstr, sizeof(outstr), "timestamp:%Y-%m-%d %H:%M:%S\n", tmp) == 0)
+        {
+            printf("[-] Timer failed \n");
+            exit(EXIT_FAILURE);
+        }
+
+        //write outstr into the file
+            // Write data to file
+            pthread_mutex_lock(&mutex_read_write);
+            if(write(arg->file_fd, outstr, strlen(outstr))==-1)
+            {
+                syslog(LOG_INFO,"Timestamp write has failed");
+                pthread_mutex_unlock(&mutex_read_write);
+                continue;
+            }
+            else
+            {
+                syslog(LOG_INFO, "Syncing data to the disk");
+                fdatasync(arg->file_fd);
+            }
+            pthread_mutex_unlock(&mutex_read_write);
+    }
+    return NULL;
+}
 /**
  * @brief Creates a daemon process
  *
@@ -228,6 +269,7 @@ bool create_daemon()
  */
 void clean()
 {
+    
     close(sockfd);
     close(client_fd);
     ftruncate(file_fd, 0);
@@ -488,7 +530,7 @@ int main(int argc, char **argv)
         syslog(LOG_ERR, "ERROR : getaddrinfo operation fail, can't get socket address");
    
         freeaddrinfo(serverInfo);
-       
+        
      
         clean();
     }
@@ -556,6 +598,31 @@ int main(int argc, char **argv)
     struct sockaddr_storage client_addr;
     socklen_t client_addr_size = sizeof(client_addr);
     
+    // timer thread
+    thread_arg *timer_t = malloc(sizeof(thread_arg));
+    if (!timer_t) {
+        syslog(LOG_ERR, "Failed to allocate thread argument");
+        close(client_fd);
+    }
+
+    timer_t -> client_fd = client_fd;
+    timer_t -> file_fd = file_fd;
+    timer_t -> socket_addr = client_addr;
+
+    pthread_t timer;
+    syslog(LOG_INFO, "Creating a new thread");
+    int err_t = pthread_create(&timer, NULL, timer_thread, timer_t);
+    if(err_t == 0)
+    {
+        printf("[+] Timer Thread creation Successfull \n");
+    }
+    else{
+        printf("[-] Thread creation Failed \n");
+        syslog(LOG_ERR, "Error creating timer thread: %s", strerror(err_t));
+        free(timer_t);
+          // because we are accepting connection infinite times and seperating it to      multiple         threads 
+    }
+
 
     while (!exit_flag)
     {
@@ -629,8 +696,12 @@ int main(int argc, char **argv)
         
     }
     thread_join();
-    
-    clean();
+    if (pthread_join(timer, NULL) != 0) {
+        syslog(LOG_ERR, "Failed to join timer thread");
+    }
+    free(timer_t);
     freeaddrinfo(serverInfo);
+    clean();
+    
 }
 
