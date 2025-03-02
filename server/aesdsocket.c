@@ -102,7 +102,7 @@ void thread_node_add(pthread_t thread_id)
     thread_node* node = (thread_node*)malloc(sizeof(thread_node));
     if(node == NULL)
     {
-        printf("[-] Thread Node creation Failed \n");
+        //printf("[-] Thread Node creation Failed \n");
         syslog(LOG_INFO, "Thread node creation failed");
         // some clean up        
     }
@@ -126,13 +126,13 @@ void thread_join()
         
         if(pthread_join(current -> threadId, NULL) == 0)
         {
-            printf("[+] joining the thread and removing it from LL\n");
+            //printf("[+] joining the thread and removing it from LL\n");
             SLIST_REMOVE(&head,current,thread_node,entry);
             free(current);
          
         }
         else{
-            printf("[-] Thread join failed \n");
+            //printf("[-] Thread join failed \n");
         }
         current = next;
 
@@ -158,7 +158,7 @@ void *timer_thread(void *args)
 
         if(strftime(outstr, sizeof(outstr), "timestamp:%Y-%m-%d %H:%M:%S\n", tmp) == 0)
         {
-            printf("[-] Timer failed \n");
+            //printf("[-] Timer failed \n");
             exit(EXIT_FAILURE);
         }
 
@@ -413,7 +413,7 @@ int send_rcv_socket_data(int client_fd, int file_fd)
         free(client_buffer);
         return -1;
     }
-    //printf("[+] Written %ld bytes \n", total_received);
+    ////printf("[+] Written %ld bytes \n", total_received);
     // Ensure data is written to disk
     if (fdatasync(file_fd) == -1)
     {
@@ -471,7 +471,7 @@ int return_socketdata_to_client(int client_fd, int file_fd)
             free(send_buffer);
             return -1;
         }
-        //printf("[+] Send %ld bytes \n", bytes_read);
+        ////printf("[+] Send %ld bytes \n", bytes_read);
 
     }
 
@@ -514,7 +514,7 @@ int main(int argc, char **argv)
         clean();
     }
     syslog(LOG_INFO, "Socket Generation Successfull with sockfd : %d", sockfd);
-    //printf("[+] Listening on port 9000 \n");
+    ////printf("[+] Listening on port 9000 \n");
 
     // Bind - Assigning address to the socket
     struct addrinfo hints;
@@ -534,12 +534,12 @@ int main(int argc, char **argv)
      
         clean();
     }
-    //printf("[+] Getaddr successfull \n");
+    ////printf("[+] Getaddr successfull \n");
 
     syslog(LOG_INFO, "getaddrinfo successfull");
 
     
-    //printf("[+] Getaddr successfull \n");
+    ////printf("[+] Getaddr successfull \n");
 
     int yes = 1;
     socklen_t size = sizeof(yes);
@@ -560,7 +560,7 @@ int main(int argc, char **argv)
     }
 
     syslog(LOG_INFO, "Bind successfull");
-    //printf("[+] Bind successfull \n");
+    ////printf("[+] Bind successfull \n");
 
     // Check if daemon to be created
     if (daemon_mode)
@@ -571,7 +571,7 @@ int main(int argc, char **argv)
             freeaddrinfo(serverInfo); // free the linked-list
             clean();
         }
-        //printf("[+] Deamon created \n");
+        ////printf("[+] Deamon created \n");
     }
 
     if (listen(sockfd, 20) == -1)
@@ -579,7 +579,7 @@ int main(int argc, char **argv)
         syslog(LOG_ERR, "ERROR : Can't Listen");
         clean();
     }
-    //printf("[+] Listening on port 9000 \n");
+    ////printf("[+] Listening on port 9000 \n");
     syslog(LOG_INFO, "Listeing successfully");
 
 
@@ -614,10 +614,10 @@ int main(int argc, char **argv)
     int err_t = pthread_create(&timer, NULL, timer_thread, timer_t);
     if(err_t == 0)
     {
-        printf("[+] Timer Thread creation Successfull \n");
+        //printf("[+] Timer Thread creation Successfull \n");
     }
     else{
-        printf("[-] Thread creation Failed \n");
+        //printf("[-] Thread creation Failed \n");
         syslog(LOG_ERR, "Error creating timer thread: %s", strerror(err_t));
         free(timer_t);
           // because we are accepting connection infinite times and seperating it to      multiple         threads 
@@ -648,10 +648,10 @@ int main(int argc, char **argv)
         }
 
         // Logging in the client ip
-        printf("\n");
+        //printf("\n");
         syslog(LOG_INFO, "Accepted connection from %s", client_ip);
        
-        //printf("[+] accepted client ip: %s\n", client_ip);
+        ////printf("[+] accepted client ip: %s\n", client_ip);
 
         // Creating a thread for accepted connection
 
@@ -671,10 +671,10 @@ int main(int argc, char **argv)
         int err = pthread_create(&thread_id, NULL, thread_operation, t_args);
         if(err == 0)
         {
-            printf("[+] Thread creation Successfull \n");
+            //printf("[+] Thread creation Successfull \n");
         }
         else{
-            printf("[-] Thread creation Failed \n");
+            //printf("[-] Thread creation Failed \n");
             syslog(LOG_ERR, "Error creating thread: %s", strerror(err));
             free(t_args);
             close(client_fd);
