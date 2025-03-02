@@ -405,7 +405,7 @@ int send_rcv_socket_data(int client_fd, int file_fd)
 
 
     // Write data to file
-    ssize_t written = write(file_fd, client_buffer, total_received);
+    size_t written = write(file_fd, client_buffer, total_received);
     if (written == -1 || written != total_received)
     {
         LOG("[-] write");
