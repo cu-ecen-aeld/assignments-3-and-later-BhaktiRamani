@@ -1,16 +1,21 @@
-CC := $(CROSS_COMPILE)gcc
+SRCS = aesdsocket.c
+OBJS = $(SRCS:.c=.o)
 
-CFLAGS := -g -Wall -Werror
+CC ?= $(CROSS_COMPILE)gcc
+CFLAGS ?= -Wall -Werror -g
+TARGET ?= aesdsocket
+LDFLAGS ?= -lpthread -lrt -Wl,--hash-style=gnu  # Add GNU_HASH flag
 
-default : aesdsocket
+.PHONY: all
+all: $(TARGET)
 
-all: aesdsocket
+$(OBJS): %.o: %.c 
+	$(CC) $(CFLAGS) -c $^ -o $@ $(INCLUDES)  # Remove LDFLAGS from this line
 
-aesdsocket : aesdsocket.o
-	$(CC) $(CFLAGS) aesdsocket.o -o aesdsocket
+$(TARGET): $(OBJS)
+	$(CC) $(CFLAGS) $^ -o $(TARGET) $(INCLUDES) $(LDFLAGS)  # Keep LDFLAGS here
 
-aesdsocket.o: aesdsocket.c
-	$(CC) $(CFLAGS) -c aesdsocket.c
+.PHONY: clean
+clean: 
+	rm -f $(OBJS) $(TARGET)
 
-clean:
-	-rm -f *.o aesdsocket

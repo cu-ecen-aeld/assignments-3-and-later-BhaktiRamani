@@ -31,6 +31,11 @@
 #include <unistd.h>
 #include <fcntl.h>
 #include <sys/stat.h>
+#include <stdlib.h>
+#include <pthread.h>
+#include <sys/queue.h>
+#include <time.h>
+
 
 // for personal debug statements
 // For personal debug statements
@@ -49,7 +54,132 @@ int sockfd, client_fd, file_fd;
 #define PORT "9000"
 #define SOCKET_FILE "/var/tmp/aesdsocketdata"
 #define CLIENT_BUFFER_LEN 1024
+FILE *tmp_file = NULL;
 
+int send_rcv_socket_data(int client_fd, int file_fd);
+int return_socketdata_to_client(int client_fd, int file_fd);
+
+typedef struct thread_arg
+{
+    int client_fd;
+    int file_fd;
+    struct sockaddr_storage socket_addr;
+}thread_arg;
+
+typedef struct thread_node{
+    pthread_t threadId;
+    SLIST_ENTRY(thread_node ) entry;
+}thread_node;
+
+SLIST_HEAD(ThreadList, thread_node) head = SLIST_HEAD_INITIALIZER(head);
+
+pthread_mutex_t mutex_read_write = PTHREAD_MUTEX_INITIALIZER;
+
+pthread_mutex_t mutex_thread_LL = PTHREAD_MUTEX_INITIALIZER;
+
+void* thread_operation(void *args)
+{
+    thread_arg* thread_args = (thread_arg*)args;
+    int client_fd_t = thread_args->client_fd;
+    int file_fd_t = thread_args->file_fd;
+    // read write operation in files
+    int written_bytes;
+    // Receive packets from the client and store in SOCKETDATA_FILE
+    if ((written_bytes = send_rcv_socket_data(client_fd_t, file_fd_t)) > 0)
+    {
+        // Send back the stored data of file back to the client
+        return_socketdata_to_client(client_fd_t, file_fd_t);
+    }
+
+    // Clean up
+    close(client_fd_t);
+    free(thread_args);
+    return NULL;
+}
+
+void thread_node_add(pthread_t thread_id)
+{
+    thread_node* node = (thread_node*)malloc(sizeof(thread_node));
+    if(node == NULL)
+    {
+        //printf("[-] Thread Node creation Failed \n");
+        syslog(LOG_INFO, "Thread node creation failed");
+        // some clean up        
+    }
+    node -> threadId = thread_id;
+    pthread_mutex_lock(&mutex_thread_LL);
+    syslog(LOG_INFO,"Inserting thread node");
+    SLIST_INSERT_HEAD(&head,node,entry);
+    pthread_mutex_unlock(&mutex_thread_LL);
+}
+
+void thread_join()
+{
+    thread_node* current = SLIST_FIRST(&head);
+    thread_node *next = NULL; 
+
+    pthread_mutex_lock(&mutex_thread_LL);
+    while(current != NULL)
+    {
+  
+        next = SLIST_NEXT(current,entry);
+        
+        if(pthread_join(current -> threadId, NULL) == 0)
+        {
+            //printf("[+] joining the thread and removing it from LL\n");
+            SLIST_REMOVE(&head,current,thread_node,entry);
+            free(current);
+         
+        }
+        else{
+            //printf("[-] Thread join failed \n");
+        }
+        current = next;
+
+    }
+    pthread_mutex_unlock(&mutex_thread_LL);
+}
+
+void *timer_thread(void *args)
+{
+    thread_arg *arg = (thread_arg*)args;
+    time_t t;
+    struct tm *tmp;
+    char outstr[200];
+    while(!exit_flag)
+    {
+        sleep(10);
+        t = time(NULL);
+        tmp = localtime(&t);
+        if (tmp == NULL) {
+            perror("localtime");
+            exit(EXIT_FAILURE);
+        }
+
+        if(strftime(outstr, sizeof(outstr), "timestamp:%Y-%m-%d %H:%M:%S\n", tmp) == 0)
+        {
+            //printf("[-] Timer failed \n");
+            exit(EXIT_FAILURE);
+        }
+
+        //write outstr into the file
+            // Write data to file
+            pthread_mutex_lock(&mutex_read_write);
+            if(write(arg->file_fd, outstr, strlen(outstr))==-1)
+            {
+                syslog(LOG_INFO,"Timestamp write has failed");
+                pthread_mutex_unlock(&mutex_read_write);
+                continue;
+            }
+            else
+            {
+                syslog(LOG_INFO, "Syncing data to the disk");
+                fdatasync(arg->file_fd);
+            }
+            pthread_mutex_unlock(&mutex_read_write);
+    }
+    return NULL;
+}
 /**
  * @brief Creates a daemon process
  *
@@ -139,6 +269,7 @@ bool create_daemon()
  */
 void clean()
 {
+    
     close(sockfd);
     close(client_fd);
     ftruncate(file_fd, 0);
@@ -262,7 +393,7 @@ int send_rcv_socket_data(int client_fd, int file_fd)
             current_size = new_size;
         }
     }
-
+    pthread_mutex_lock(&mutex_read_write);
     // Reset file position to beginning before writing
     if (lseek(file_fd, 0, SEEK_SET) == -1)
     {
@@ -274,7 +405,7 @@ int send_rcv_socket_data(int client_fd, int file_fd)
 
 
     // Write data to file
-    ssize_t written = write(file_fd, client_buffer, total_received);
+    size_t written = write(file_fd, client_buffer, total_received);
     if (written == -1 || written != total_received)
     {
         LOG("[-] write");
@@ -282,7 +413,7 @@ int send_rcv_socket_data(int client_fd, int file_fd)
         free(client_buffer);
         return -1;
     }
-    //printf("[+] Written %ld bytes \n", total_received);
+    ////printf("[+] Written %ld bytes \n", total_received);
     // Ensure data is written to disk
     if (fdatasync(file_fd) == -1)
     {
@@ -293,6 +424,7 @@ int send_rcv_socket_data(int client_fd, int file_fd)
     }
 
     free(client_buffer);
+    pthread_mutex_unlock(&mutex_read_write);
     return written;
 }
 
@@ -311,6 +443,7 @@ int return_socketdata_to_client(int client_fd, int file_fd)
     char *send_buffer;
     ssize_t bytes_read;
 
+    pthread_mutex_lock(&mutex_read_write);
     // Reset file position to start
     lseek(file_fd, 0, SEEK_SET);
 
@@ -322,6 +455,7 @@ int return_socketdata_to_client(int client_fd, int file_fd)
         return -1;
     }
 
+    
     // Read and send data
     while ((bytes_read = read(file_fd, send_buffer, CLIENT_BUFFER_LEN - 1)) > 0)
     {
@@ -337,11 +471,12 @@ int return_socketdata_to_client(int client_fd, int file_fd)
             free(send_buffer);
             return -1;
         }
-        //printf("[+] Send %ld bytes \n", bytes_read);
+        ////printf("[+] Send %ld bytes \n", bytes_read);
 
     }
 
     free(send_buffer);
+    pthread_mutex_unlock(&mutex_read_write);
     return 0;
 }
 
@@ -379,7 +514,7 @@ int main(int argc, char **argv)
         clean();
     }
     syslog(LOG_INFO, "Socket Generation Successfull with sockfd : %d", sockfd);
-    //printf("[+] Listening on port 9000 \n");
+    ////printf("[+] Listening on port 9000 \n");
 
     // Bind - Assigning address to the socket
     struct addrinfo hints;
@@ -395,16 +530,16 @@ int main(int argc, char **argv)
         syslog(LOG_ERR, "ERROR : getaddrinfo operation fail, can't get socket address");
    
         freeaddrinfo(serverInfo);
-       
+        
      
         clean();
     }
-    //printf("[+] Getaddr successfull \n");
+    ////printf("[+] Getaddr successfull \n");
 
     syslog(LOG_INFO, "getaddrinfo successfull");
 
     
-    //printf("[+] Getaddr successfull \n");
+    ////printf("[+] Getaddr successfull \n");
 
     int yes = 1;
     socklen_t size = sizeof(yes);
@@ -425,7 +560,7 @@ int main(int argc, char **argv)
     }
 
     syslog(LOG_INFO, "Bind successfull");
-    //printf("[+] Bind successfull \n");
+    ////printf("[+] Bind successfull \n");
 
     // Check if daemon to be created
     if (daemon_mode)
@@ -436,7 +571,7 @@ int main(int argc, char **argv)
             freeaddrinfo(serverInfo); // free the linked-list
             clean();
         }
-        //printf("[+] Deamon created \n");
+        ////printf("[+] Deamon created \n");
     }
 
     if (listen(sockfd, 20) == -1)
@@ -444,7 +579,7 @@ int main(int argc, char **argv)
         syslog(LOG_ERR, "ERROR : Can't Listen");
         clean();
     }
-    //printf("[+] Listening on port 9000 \n");
+    ////printf("[+] Listening on port 9000 \n");
     syslog(LOG_INFO, "Listeing successfully");
 
 
@@ -463,6 +598,31 @@ int main(int argc, char **argv)
     struct sockaddr_storage client_addr;
     socklen_t client_addr_size = sizeof(client_addr);
     
+    // timer thread
+    thread_arg *timer_t = malloc(sizeof(thread_arg));
+    if (!timer_t) {
+        syslog(LOG_ERR, "Failed to allocate thread argument");
+        close(client_fd);
+    }
+
+    timer_t -> client_fd = client_fd;
+    timer_t -> file_fd = file_fd;
+    timer_t -> socket_addr = client_addr;
+
+    pthread_t timer;
+    syslog(LOG_INFO, "Creating a new thread");
+    int err_t = pthread_create(&timer, NULL, timer_thread, timer_t);
+    if(err_t == 0)
+    {
+        //printf("[+] Timer Thread creation Successfull \n");
+    }
+    else{
+        //printf("[-] Thread creation Failed \n");
+        syslog(LOG_ERR, "Error creating timer thread: %s", strerror(err_t));
+        free(timer_t);
+          // because we are accepting connection infinite times and seperating it to      multiple         threads 
+    }
+
 
     while (!exit_flag)
     {
@@ -488,20 +648,60 @@ int main(int argc, char **argv)
         }
 
         // Logging in the client ip
+        //printf("\n");
         syslog(LOG_INFO, "Accepted connection from %s", client_ip);
-        //printf("[+] accepted client ip: %s\n", client_ip);
+       
+        ////printf("[+] accepted client ip: %s\n", client_ip);
 
-        int written_bytes;
-        // Receive packets from the client and store in SOCKETDATA_FILE
-        if ((written_bytes = send_rcv_socket_data(client_fd, file_fd)) > 0)
-        {
-            // Send back the stored data of file back to the client
-            return_socketdata_to_client(client_fd, file_fd);
+        // Creating a thread for accepted connection
+
+        thread_arg *t_args = malloc(sizeof(thread_arg));
+        if (!t_args) {
+            syslog(LOG_ERR, "Failed to allocate thread argument");
+            close(client_fd);
+            continue;
         }
+
+        t_args -> client_fd = client_fd;
+        t_args -> file_fd = file_fd;
+        t_args -> socket_addr = client_addr;
+
+        pthread_t thread_id;
+        syslog(LOG_INFO, "Creating a new thread");
+        int err = pthread_create(&thread_id, NULL, thread_operation, t_args);
+        if(err == 0)
+        {
+            //printf("[+] Thread creation Successfull \n");
+        }
+        else{
+            //printf("[-] Thread creation Failed \n");
+            syslog(LOG_ERR, "Error creating thread: %s", strerror(err));
+            free(t_args);
+            close(client_fd);
+            continue;           // because we are accepting connection infinite times and seperating it to      multiple         threads 
+
+        }
+
+        thread_node_add(thread_id);
+        thread_join();
+        
+
+        // int written_bytes;
+        // // Receive packets from the client and store in SOCKETDATA_FILE
+        // if ((written_bytes = send_rcv_socket_data(client_fd, file_fd)) > 0)
+        // {
+        //     // Send back the stored data of file back to the client
+        //     return_socketdata_to_client(client_fd, file_fd);
+        // }
         
     }
-    
-    clean();
+    thread_join();
+    // if (pthread_join(timer, NULL) != 0) {
+    //     syslog(LOG_ERR, "Failed to join timer thread");
+    // }
+    free(timer_t);
     freeaddrinfo(serverInfo);
+    clean();
+    
 }
 
