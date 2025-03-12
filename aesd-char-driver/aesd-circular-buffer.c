@@ -32,6 +32,41 @@ struct aesd_buffer_entry *aesd_circular_buffer_find_entry_offset_for_fpos(struct
     /**
     * TODO: implement per description
     */
+    // Check if inputs are valid pointers
+    if (buffer == NULL || entry_offset_byte_rtn == NULL) {
+        return NULL;
+    }
+    
+    // Track accumulated size as we traverse the buffer
+    size_t accumulated_size = 0;
+    size_t current_index = buffer->out_offs;
+    size_t entry_size;
+    
+    // Count filled entries to limit our search
+    size_t entries_to_check = 0;
+    for (int i = 0; i < AESDCHAR_MAX_WRITE_OPERATIONS_SUPPORTED; i++) {
+        if (buffer->entry[(buffer->out_offs + i) % AESDCHAR_MAX_WRITE_OPERATIONS_SUPPORTED].buffptr != NULL) {
+            entries_to_check++;
+        }
+    }
+    
+    // Traverse the buffer looking for the correct entry
+    for (size_t i = 0; i < entries_to_check; i++) {
+        entry_size = strlen(buffer->entry[current_index].buffptr);
+        
+        if (char_offset >= accumulated_size && char_offset < accumulated_size + entry_size) {
+            // Found the entry containing our target position
+            *entry_offset_byte_rtn = char_offset - accumulated_size;
+            return &buffer->entry[current_index];
+        }
+        
+        // Move to next entry
+        accumulated_size += entry_size;
+        current_index = (current_index + 1) % AESDCHAR_MAX_WRITE_OPERATIONS_SUPPORTED;
+    }
+    
+    // Position not found in buffer
+    *entry_offset_byte_rtn = 0;
     return NULL;
 }
 
@@ -47,6 +82,28 @@ void aesd_circular_buffer_add_entry(struct aesd_circular_buffer *buffer, const s
     /**
     * TODO: implement per description
     */
+       // Check if inputs are valid pointers
+       if (buffer == NULL || add_entry == NULL) {
+        return;
+    }
+    
+    // Store current state before modification
+    size_t current_in = buffer->in_offs;
+    
+    // Calculate next input position
+    buffer->in_offs = (buffer->in_offs + 1) % AESDCHAR_MAX_WRITE_OPERATIONS_SUPPORTED;
+    
+    // Copy the entry to the buffer at the current input position
+    buffer->entry[current_in] = *add_entry;
+    
+    // Determine if we need to update out_offs based on buffer state
+    if (buffer->full) {
+        // Buffer was already full, so move the output pointer
+        buffer->out_offs = buffer->in_offs;
+    } else if (buffer->in_offs == buffer->out_offs) {
+        // We've just filled the buffer completely
+        buffer->full = true;
+    }
 }
 
 /**
