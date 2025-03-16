@@ -506,7 +506,7 @@ int return_socketdata_to_client(int client_fd, int file_fd)
     while ((bytes_read = read(file_fd, send_buffer, CLIENT_BUFFER_LEN)) > 0)
     {
     
-        printf("No_OF Bytes read : %ld and data : %s\n",bytes_read, send_buffer);
+       // printf("No_OF Bytes read : %ld and data : %s\n",bytes_read, send_buffer);
         ssize_t sent = send(client_fd, send_buffer, bytes_read, 0);
         if (sent == -1)
         {
