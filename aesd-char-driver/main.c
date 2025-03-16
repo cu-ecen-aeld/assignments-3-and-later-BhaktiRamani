@@ -74,6 +74,7 @@ ssize_t aesd_read(struct file *filp, char __user *buf, size_t count, loff_t *f_p
     size_t entry_offset = 0;
     size_t bytes_copied = 0;
     size_t remaining_count = count;
+    //*f_pos = 0;
     
     retval = mutex_lock_interruptible(&dev->buffer_lock);
     if (retval != 0) {
@@ -126,66 +127,7 @@ unlock_exit:
     return retval;
 }
 
-// ssize_t aesd_read(struct file *filp, char __user *buf, size_t count, loff_t *f_pos)
-// {
-//     ssize_t retval = 0;
-//     PDEBUG("read %zu bytes with offset %lld", count, *f_pos);
-//     printk(KERN_INFO "aesdchar: Reading %zu bytes\n", count);
-    
-//     // Check if inputs are valid
-//     if (!buf || !filp || !f_pos || *f_pos < 0 || count <= 0) {
-//         PDEBUG("Invalid input parameters for read syscall");
-//         return -EINVAL;
-//     }
-    
-//     struct aesd_dev *dev = filp->private_data;
-//     size_t entry_offset = 0;
-    
-//     // Acquire mutex
-//     retval = mutex_lock_interruptible(&dev->buffer_lock);
-//     if (retval != 0) {
-//         PDEBUG("Error: Unable to acquire mutex");
-//         return -ERESTARTSYS;
-//     }
-    
-//     // Find the entry containing our current file position
-//     struct aesd_buffer_entry *entry = aesd_circular_buffer_find_entry_offset_for_fpos(
-//                                         &dev->buffer, *f_pos, &entry_offset);
-    
-//     if (!entry || !entry->buffptr) {
-//         // No more data to read
-//         retval = 0;
-//         goto unlock_exit;
-//     }
-    
-//     // Calculate how many bytes we can read from this entry
-//     size_t bytes_to_read = entry->size - entry_offset;
-//     if (bytes_to_read > count) {
-//         bytes_to_read = count;
-//     }
-    
-//     // Copy data to user space
-//     if (copy_to_user(buf, entry->buffptr + entry_offset, bytes_to_read)) {
-//         PDEBUG("ERROR: Failed to copy data to user space");
-//         retval = -EFAULT;
-//         goto unlock_exit;
-//     }
-    
-//     // Update the file position and set the return value
-//     // *f_pos += bytes_to_read;
-//         // Update the file position and set the return value
-//     *f_pos += bytes_to_read;
 
-//     // Check if we've reached the end of this entry, and if there is more data in the next entry
-//     // if (*f_pos >= entry->size) {
-//     //     *f_pos = 0; // Reset file position if we've read to the end of the current entry
-//     // }
-//     retval = bytes_to_read;
-    
-//     unlock_exit:
-//         mutex_unlock(&dev->buffer_lock);
-//         return retval;
-// }
 
 static int val = 1;
 
@@ -256,6 +198,7 @@ ssize_t aesd_write(struct file *filp, const char __user *buf, size_t count, loff
         
         if (dev->partial_write) {
             // Append this write to existing partial
+            PDEBUG("Partial Write");
             combined_size = dev->partial_size + count;
             combined_buf = krealloc(dev->partial_write, combined_size, GFP_KERNEL);
             

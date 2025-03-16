@@ -166,6 +166,12 @@ int main() {
     test_write(fd, "Write 11");
     //lseek(fd, 0, SEEK_SET);  // Reset file position for reading
     test_read(fd);
+
+    // printf("\nTesting partial writes...\n");
+    // test_write(fd, "part");
+    // test_write(fd, "ial");
+    // test_write(fd, "_write\n");
+    // test_read(fd);
     
 
 
