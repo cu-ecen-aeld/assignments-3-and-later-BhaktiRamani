@@ -280,7 +280,7 @@ static int aesd_setup_cdev(struct aesd_dev *dev)
 
 static int __init aesd_init_module(void)
 {
-    printk(KERN_INFO "module loaded -- 1\n");
+   
     dev_t dev = 0;
     int result;
     result = alloc_chrdev_region(&dev, aesd_minor, 1, "aesdchar");
@@ -301,13 +301,13 @@ static int __init aesd_init_module(void)
     if (result) {
         unregister_chrdev_region(dev, 1);
     }
-    printk(KERN_INFO "aesd cdev setup -- 21\n");
+ 
     return result;
 }
 
 static void __exit aesd_cleanup_module(void)
 {
-    printk(KERN_INFO "module unloaded -- 1\n");
+  
     dev_t devno = MKDEV(aesd_major, aesd_minor);
 
     cdev_del(&aesd_device.cdev);
