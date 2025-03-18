@@ -36,6 +36,9 @@
 #include <sys/queue.h>
 #include <time.h>
 
+#define USE_AESD_CHAR_DEVICE 1
+
+
 
 // for personal debug statements
 // For personal debug statements
@@ -46,13 +49,25 @@
 #define LOG(...) do {} while (0)
 #endif
 
+
+
 /* Global variables */
 bool exit_flag = false;
 int sockfd, client_fd, file_fd;
 
 /* Constants */
 #define PORT "9000"
-#define SOCKET_FILE "/var/tmp/aesdsocketdata"
+#ifdef USE_AESD_CHAR_DEVICE
+    #define SOCKET_FILE "/dev/aesdchar"
+#else
+    #define SOCKET_FILE "/var/tmp/aesdsocketdata"
+#endif
+
+//#ifndef USE_AESD_CHAR_DEVICE
+//static pthread_t g_timer_thread;
+//#endif
+
+
 #define CLIENT_BUFFER_LEN 1024
 FILE *tmp_file = NULL;
 
@@ -89,6 +104,7 @@ void* thread_operation(void *args)
     {
         // Send back the stored data of file back to the client
         return_socketdata_to_client(client_fd_t, file_fd_t);
+        
     }
 
     // Clean up
@@ -140,6 +156,7 @@ void thread_join()
     pthread_mutex_unlock(&mutex_thread_LL);
 }
 
+#ifndef USE_AESD_CHAR_DEVICE
 void *timer_thread(void *args)
 {
     thread_arg *arg = (thread_arg*)args;
@@ -180,6 +197,8 @@ void *timer_thread(void *args)
     }
     return NULL;
 }
+
+#endif
 /**
  * @brief Creates a daemon process
  *
@@ -395,13 +414,18 @@ int send_rcv_socket_data(int client_fd, int file_fd)
     }
     pthread_mutex_lock(&mutex_read_write);
     // Reset file position to beginning before writing
-    if (lseek(file_fd, 0, SEEK_SET) == -1)
-    {
-        LOG("[-] lseek");
-        syslog(LOG_ERR, "ERROR: lseek failed: %s", strerror(errno));
-        free(client_buffer);
-        return -1;
-    }
+
+    #ifndef USE_AESD_CHAR_DEVICE
+        if (lseek(file_fd, 0, SEEK_SET) == -1)
+        {
+            LOG("[-] lseek");
+            syslog(LOG_ERR, "ERROR: lseek failed: %s", strerror(errno));
+            free(client_buffer);
+            return -1;
+        }
+    #endif
+        
+        //read(file_fd, client_buffer, sizeof(client_buffer));
 
 
     // Write data to file
@@ -415,13 +439,15 @@ int send_rcv_socket_data(int client_fd, int file_fd)
     }
     ////printf("[+] Written %ld bytes \n", total_received);
     // Ensure data is written to disk
-    if (fdatasync(file_fd) == -1)
-    {
-        LOG("[-] fdatasync");
-        syslog(LOG_ERR, "ERROR: fdatasync failed: %s", strerror(errno));
-        free(client_buffer);
-        return -1;
-    }
+    #ifndef USE_AESD_CHAR_DEVICE
+        if (fdatasync(file_fd) == -1)
+        {
+            LOG("[-] fdatasync");
+            syslog(LOG_ERR, "ERROR: fdatasync failed: %s", strerror(errno));
+            free(client_buffer);
+            return -1;
+        }
+    #endif
 
     free(client_buffer);
     pthread_mutex_unlock(&mutex_read_write);
@@ -444,8 +470,29 @@ int return_socketdata_to_client(int client_fd, int file_fd)
     ssize_t bytes_read;
 
     pthread_mutex_lock(&mutex_read_write);
+ 
     // Reset file position to start
-    lseek(file_fd, 0, SEEK_SET);
+    //lseek(file_fd, 0, SEEK_SET);
+    //     // For character device, close and reopen to reset position
+    #ifdef USE_AESD_CHAR_DEVICE
+        close(file_fd);
+        file_fd = open(SOCKET_FILE, O_RDWR | O_APPEND | O_CREAT, 0666);
+        if (file_fd == -1) {
+            LOG("[-] reopen");
+            syslog(LOG_ERR, "ERROR: Reopening device failed: %s", strerror(errno));
+            pthread_mutex_unlock(&mutex_read_write);
+            return -1;
+        }
+    #else
+        // Reset file position to start for regular files
+        if (lseek(file_fd, 0, SEEK_SET) == -1) {
+            LOG("[-] lseek");
+            syslog(LOG_ERR, "ERROR: lseek failed: %s", strerror(errno));
+            pthread_mutex_unlock(&mutex_read_write);
+            return -1;
+        }
+    #endif
+  
 
     send_buffer = (char *)malloc(CLIENT_BUFFER_LEN);
     if (send_buffer == NULL)
@@ -455,11 +502,11 @@ int return_socketdata_to_client(int client_fd, int file_fd)
         return -1;
     }
 
-    
     // Read and send data
-    while ((bytes_read = read(file_fd, send_buffer, CLIENT_BUFFER_LEN - 1)) > 0)
+    while ((bytes_read = read(file_fd, send_buffer, CLIENT_BUFFER_LEN)) > 0)
     {
     
+       // printf("No_OF Bytes read : %ld and data : %s\n",bytes_read, send_buffer);
         ssize_t sent = send(client_fd, send_buffer, bytes_read, 0);
         if (sent == -1)
         {
@@ -599,29 +646,34 @@ int main(int argc, char **argv)
     socklen_t client_addr_size = sizeof(client_addr);
     
     // timer thread
-    thread_arg *timer_t = malloc(sizeof(thread_arg));
-    if (!timer_t) {
-        syslog(LOG_ERR, "Failed to allocate thread argument");
-        close(client_fd);
-    }
+    
+    #ifndef USE_AESD_CHAR_DEVICE
+  
+	    thread_arg *timer_t = malloc(sizeof(thread_arg));
+	    if (!timer_t) {
+		syslog(LOG_ERR, "Failed to allocate thread argument");
+		close(client_fd);
+	    }
 
-    timer_t -> client_fd = client_fd;
-    timer_t -> file_fd = file_fd;
-    timer_t -> socket_addr = client_addr;
+	    timer_t -> client_fd = client_fd;
+	    timer_t -> file_fd = file_fd;
+	    timer_t -> socket_addr = client_addr;
 
-    pthread_t timer;
-    syslog(LOG_INFO, "Creating a new thread");
-    int err_t = pthread_create(&timer, NULL, timer_thread, timer_t);
-    if(err_t == 0)
-    {
-        //printf("[+] Timer Thread creation Successfull \n");
-    }
-    else{
-        //printf("[-] Thread creation Failed \n");
-        syslog(LOG_ERR, "Error creating timer thread: %s", strerror(err_t));
-        free(timer_t);
-          // because we are accepting connection infinite times and seperating it to      multiple         threads 
-    }
+	    pthread_t timer;
+	    syslog(LOG_INFO, "Creating a new thread");
+	    int err_t = pthread_create(&timer, NULL, timer_thread, timer_t);
+	    if(err_t == 0)
+	    {
+		//printf("[+] Timer Thread creation Successfull \n");
+	    }
+	    else{
+		//printf("[-] Thread creation Failed \n");
+		syslog(LOG_ERR, "Error creating timer thread: %s", strerror(err_t));
+		free(timer_t);
+		  // because we are accepting connection infinite times and seperating it to      multiple         threads 
+	    }
+    
+    #endif
 
 
     while (!exit_flag)
@@ -699,7 +751,9 @@ int main(int argc, char **argv)
     // if (pthread_join(timer, NULL) != 0) {
     //     syslog(LOG_ERR, "Failed to join timer thread");
     // }
-    free(timer_t);
+    #ifndef USE_AESD_CHAR_DEVICE
+        free(timer_t);
+    #endif
     freeaddrinfo(serverInfo);
     clean();
     
