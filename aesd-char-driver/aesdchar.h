@@ -39,7 +39,6 @@ struct aesd_dev
      size_t partial_size;
 
 
-
 };
 
 

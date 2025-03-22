@@ -64,7 +64,6 @@ ssize_t aesd_read(struct file *filp, char __user *buf, size_t count, loff_t *f_p
     PDEBUG("read %zu bytes with offset %lld", count, *f_pos);
     
 
-
     if (!buf || !filp || !f_pos || *f_pos < 0 || count <= 0) {
         PDEBUG("Invalid input parameters for read syscall");
         return -EINVAL;
@@ -253,11 +252,37 @@ unlock_exit:
     return retval;
 }
 
+// static loff_t aesd_llseek(struct file *filp, loff_t offset, int cmd){
+//     struct aesd_dev *dev = filp->private_data;
+//     loff_t new_pos;
+
+//     switch(cmd){
+        
+//         case SEEK_SET:          //file offset = offset bytes
+//             new_pos = offset;
+//             break;
+//         case SEEK_CUR:          //file offset = current offset + offset bytes
+//             new_pos = filp->f_pos + offset;
+//             break;
+//         case SEEK_END:          //file offset = total size of the file + offset bytes
+//             //logic is doubtable
+//             new_pos = (dev -> buffer.out_offs + offset ) % AESDCHAR_MAX_WRITE_OPERATIONS_SUPPORTED;
+//             break;
+//         default:
+//             return -EINVAL;
+//             break;
+//     }
+//     if(new_pos < 0) return -EINVAL;
+//     filp->f_pos = new_pos;
+//     return new_pos;
+// }
+
 struct file_operations aesd_fops = {
     .owner =    THIS_MODULE,
     .read =     aesd_read,
     .write =    aesd_write,
     .open =     aesd_open,
+    // .llseek =   aesd_llseek,
     .release =  aesd_release,
 
 };
