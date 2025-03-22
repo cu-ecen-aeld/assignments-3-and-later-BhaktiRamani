@@ -283,6 +283,9 @@ struct file_operations aesd_fops = {
     .write =    aesd_write,
     .open =     aesd_open,
     // .llseek =   aesd_llseek,
+
+
+    
     .release =  aesd_release,
 
 };
