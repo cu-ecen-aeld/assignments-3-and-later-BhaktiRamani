@@ -38,20 +38,20 @@ struct aesd_dev aesd_device;
 
 int aesd_open(struct inode *inode, struct file *filp)
 {
-    PDEBUG("open");
+   
     /**
      * TODO: handle open
      */
     filp->private_data = container_of(inode->i_cdev, struct aesd_dev, cdev);
 
-    printk(KERN_INFO "aesdchar : Open file\n");
+    printk(KERN_INFO "aesdchar:Open file\n");
   
     return 0;
 }
 
 int aesd_release(struct inode *inode, struct file *filp)
 {
-    PDEBUG("release");
+
     /**
      * TODO: handle release
      */
