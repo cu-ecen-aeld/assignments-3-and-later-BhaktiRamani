@@ -531,27 +531,27 @@ int return_socketdata_to_client(int client_fd, int file_fd)
     pthread_mutex_lock(&mutex_read_write);
  
     // Reset file position to start
-    lseek(file_fd, 0, SEEK_SET);
+    //lseek(file_fd, 0, SEEK_SET);
     //     // For character device, close and reopen to reset position
     //CHANGES
-    // #ifdef USE_AESD_CHAR_DEVICE
-    //     close(file_fd);
-    //     file_fd = open(SOCKET_FILE, O_RDWR | O_APPEND | O_CREAT, 0666);
-    //     if (file_fd == -1) {
-    //         LOG("[-] reopen");
-    //         syslog(LOG_ERR, "ERROR: Reopening device failed: %s", strerror(errno));
-    //         pthread_mutex_unlock(&mutex_read_write);
-    //         return -1;
-    //     }
-    // #else
-    //     // Reset file position to start for regular files
-    //     if (lseek(file_fd, 0, SEEK_SET) == -1) {
-    //         LOG("[-] lseek");
-    //         syslog(LOG_ERR, "ERROR: lseek failed: %s", strerror(errno));
-    //         pthread_mutex_unlock(&mutex_read_write);
-    //         return -1;
-    //     }
-    // #endif
+    #ifdef USE_AESD_CHAR_DEVICE
+        close(file_fd);
+        file_fd = open(SOCKET_FILE, O_RDWR | O_APPEND | O_CREAT, 0666);
+        if (file_fd == -1) {
+            LOG("[-] reopen");
+            syslog(LOG_ERR, "ERROR: Reopening device failed: %s", strerror(errno));
+            pthread_mutex_unlock(&mutex_read_write);
+            return -1;
+        }
+    #else
+        // Reset file position to start for regular files
+        if (lseek(file_fd, 0, SEEK_SET) == -1) {
+            LOG("[-] lseek");
+            syslog(LOG_ERR, "ERROR: lseek failed: %s", strerror(errno));
+            pthread_mutex_unlock(&mutex_read_write);
+            return -1;
+        }
+    #endif
 
     #ifndef USE_AESD_CHAR_DEVICE
     // Reset file position to start for regular files

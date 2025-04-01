@@ -254,6 +254,58 @@ unlock_exit:
     return retval;
 }
 
+loff_t aesd_llseek_2(struct file *filp,loff_t offset,int whence)
+{
+    loff_t ret_value;
+    int total_length = 0;
+    struct aesd_dev *dev = filp->private_data;
+    
+    switch(whence)
+    {
+        case SEEK_SET:
+            //Set the file position to the specified offset
+            ret_value = filp->f_pos;
+            break;
+        case SEEK_CUR:
+            //Set the file position relative to the current position
+            ret_value = filp->f_pos +offset;
+            break;
+        case SEEK_END:
+            //Set the file position relative to the end of the buffer
+            // Attempt to acquire the buffer mutex to calculate total buffer length
+            ret_value = mutex_lock_interruptible(&dev->buffer_lock);
+            if(ret_value !=0)
+            {
+                ret_value = -ERESTART;
+                PDEBUG("Error: Unable to do mutex lock");
+                goto exit;
+            }
+            //Calculate the total length 
+            for(int i= dev->buffer.out_offs; i!=dev->buffer.in_offs;)
+            {
+                total_length +=dev->buffer.entry[i].size;
+                i = (i+1)%AESDCHAR_MAX_WRITE_OPERATIONS_SUPPORTED;
+            }
+            mutex_unlock(&dev->buffer_lock);
+            ret_value = total_length-1+offset;
+            break;
+        default:
+            ret_value = -EINVAL;
+            goto exit;           
+    }
+    if(ret_value<0 )
+    {
+        ret_value = -EINVAL;
+        goto exit;
+    }
+
+   
+    filp->f_pos = ret_value;
+    PDEBUG("File position seeked to %d",filp->f_pos);
+
+exit:
+    return ret_value;
+}
 
 static loff_t aesd_llseek(struct file *filp, loff_t offset, int whence)
 {
@@ -344,6 +396,7 @@ static long aesd_unlocked_ioctl(struct file *filp, unsigned int cmd, unsigned lo
 
     new_fpos += seekto.write_cmd_offset;
     filp->f_pos = new_fpos;
+    PDEBUG("IOCTL new file position : %d", filp->f_pos);
 
     mutex_unlock(&dev->buffer_lock);
     return 0;
