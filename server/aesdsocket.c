@@ -289,7 +289,6 @@ bool create_daemon()
  */
 void clean()
 {
-    
     close(sockfd);
     close(client_fd);
     ftruncate(file_fd, 0);
