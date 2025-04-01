@@ -125,7 +125,7 @@ void thread_node_add(pthread_t thread_id)
     }
     node -> threadId = thread_id;
     pthread_mutex_lock(&mutex_thread_LL);
-    syslog(LOG_INFO,"Inserting thread node");
+    // syslog(LOG_INFO,"Inserting thread node");
     SLIST_INSERT_HEAD(&head,node,entry);
     pthread_mutex_unlock(&mutex_thread_LL);
 }
@@ -341,6 +341,7 @@ void reg_signal_handler(void)
      }
 }
 
+bool ioctl_just_performed = false;
 /**
  * @brief Receives data from client and writes to file
  *
@@ -440,6 +441,7 @@ int send_rcv_socket_data(int client_fd, int file_fd)
             
             // Return a positive value to indicate success (but no bytes written)
             written = 1;
+            ioctl_just_performed = true;
         }
         else
         {
@@ -462,6 +464,7 @@ int send_rcv_socket_data(int client_fd, int file_fd)
             return -1;
         }
         
+        ioctl_just_performed = false;
         // Ensure data is written to disk for regular files
         #ifndef USE_AESD_CHAR_DEVICE
             if (fdatasync(file_fd) == -1)
@@ -534,7 +537,39 @@ int return_socketdata_to_client(int client_fd, int file_fd)
     //lseek(file_fd, 0, SEEK_SET);
     //     // For character device, close and reopen to reset position
     //CHANGES
+    // #ifdef USE_AESD_CHAR_DEVICE
+    //     close(file_fd);
+    //     file_fd = open(SOCKET_FILE, O_RDWR | O_APPEND | O_CREAT, 0666);
+    //     if (file_fd == -1) {
+    //         LOG("[-] reopen");
+    //         syslog(LOG_ERR, "ERROR: Reopening device failed: %s", strerror(errno));
+    //         pthread_mutex_unlock(&mutex_read_write);
+    //         return -1;
+    //     }
+    // #else
+    //     // Reset file position to start for regular files
+    //     if (lseek(file_fd, 0, SEEK_SET) == -1) {
+    //         LOG("[-] lseek");
+    //         syslog(LOG_ERR, "ERROR: lseek failed: %s", strerror(errno));
+    //         pthread_mutex_unlock(&mutex_read_write);
+    //         return -1;
+    //     }
+    // #endif
+
+    // #ifndef USE_AESD_CHAR_DEVICE
+    // // Reset file position to start for regular files
+    // if (lseek(file_fd, 0, SEEK_SET) == -1) {
+    //     LOG("[-] lseek");
+    //     syslog(LOG_ERR, "ERROR: lseek failed: %s", strerror(errno));
+    //     pthread_mutex_unlock(&mutex_read_write);
+    //     return -1;
+    // }
+    // #endif
+
     #ifdef USE_AESD_CHAR_DEVICE
+    // For character device, handle based on ioctl flag
+    if (!ioctl_just_performed) {
+        // Only reopen if we didn't just perform an ioctl
         close(file_fd);
         file_fd = open(SOCKET_FILE, O_RDWR | O_APPEND | O_CREAT, 0666);
         if (file_fd == -1) {
@@ -543,25 +578,18 @@ int return_socketdata_to_client(int client_fd, int file_fd)
             pthread_mutex_unlock(&mutex_read_write);
             return -1;
         }
-    #else
-        // Reset file position to start for regular files
-        if (lseek(file_fd, 0, SEEK_SET) == -1) {
-            LOG("[-] lseek");
-            syslog(LOG_ERR, "ERROR: lseek failed: %s", strerror(errno));
-            pthread_mutex_unlock(&mutex_read_write);
-            return -1;
-        }
-    #endif
-
-    #ifndef USE_AESD_CHAR_DEVICE
-    // Reset file position to start for regular files
+    }
+    // Reset flag after using it
+    ioctl_just_performed = false;
+#else
+    // For regular files, always reset to beginning
     if (lseek(file_fd, 0, SEEK_SET) == -1) {
         LOG("[-] lseek");
         syslog(LOG_ERR, "ERROR: lseek failed: %s", strerror(errno));
         pthread_mutex_unlock(&mutex_read_write);
         return -1;
     }
-    #endif
+#endif
   
 
     send_buffer = (char *)malloc(CLIENT_BUFFER_LEN);
@@ -771,7 +799,7 @@ int main(int argc, char **argv)
 
         // Logging in the client ip
         //printf("\n");
-        syslog(LOG_INFO, "Accepted connection from %s", client_ip);
+        //syslog(LOG_INFO, "Accepted connection from %s", client_ip);
        
         ////printf("[+] accepted client ip: %s\n", client_ip);
 
@@ -789,7 +817,7 @@ int main(int argc, char **argv)
         t_args -> socket_addr = client_addr;
 
         pthread_t thread_id;
-        syslog(LOG_INFO, "Creating a new thread");
+        // syslog(LOG_INFO, "Creating a new thread");
         int err = pthread_create(&thread_id, NULL, thread_operation, t_args);
         if(err == 0)
         {
