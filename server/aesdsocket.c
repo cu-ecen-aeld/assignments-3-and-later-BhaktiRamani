@@ -35,6 +35,8 @@
 #include <pthread.h>
 #include <sys/queue.h>
 #include <time.h>
+#include <sys/ioctl.h>
+#include "../aesd-char-driver/aesd_ioctl.h"
 
 #define USE_AESD_CHAR_DEVICE 1
 
@@ -73,6 +75,7 @@ FILE *tmp_file = NULL;
 
 int send_rcv_socket_data(int client_fd, int file_fd);
 int return_socketdata_to_client(int client_fd, int file_fd);
+struct aesd_seekto seek_to;
 
 typedef struct thread_arg
 {
@@ -340,6 +343,8 @@ void reg_signal_handler(void)
      }
 }
 
+
+#define SEEK_COMMAND "AESDCHAR_IOCSEEKTO:"
 /**
  * @brief Receives data from client and writes to file
  *
@@ -413,30 +418,58 @@ int send_rcv_socket_data(int client_fd, int file_fd)
         }
     }
     pthread_mutex_lock(&mutex_read_write);
-    // Reset file position to beginning before writing
 
-    #ifndef USE_AESD_CHAR_DEVICE
-        if (lseek(file_fd, 0, SEEK_SET) == -1)
+        // Check if command matches "AESDCHAR_IOCSEEKTO:X,Y"
+        unsigned int X, Y;
+        if (sscanf(client_buffer, "AESDCHAR_IOCSEEKTO:%u,%u", &X, &Y) == 2)
         {
-            LOG("[-] lseek");
-            syslog(LOG_ERR, "ERROR: lseek failed: %s", strerror(errno));
+            struct aesd_seekto seek_cmd = {X, Y};
+    
+            syslog(LOG_INFO, "Received ioctl command: AESDCHAR_IOCSEEKTO:%u,%u", X, Y);
+    
+            // Send ioctl to the device
+            if (ioctl(file_fd, AESDCHAR_IOCSEEKTO, &seek_cmd) == -1)
+            {
+                syslog(LOG_ERR, "ERROR: ioctl failed: %s", strerror(errno));
+                free(client_buffer);
+                return -1;
+            }
+    
+            // Do NOT write this command to aesdchar. Instead, read and send back the contents.
+            char read_buffer[CLIENT_BUFFER_LEN] = {0};
+            ssize_t read_bytes;
+    
+            pthread_mutex_lock(&mutex_read_write);
+            while ((read_bytes = read(file_fd, read_buffer, CLIENT_BUFFER_LEN - 1)) > 0)
+            {
+                send(client_fd, read_buffer, read_bytes, 0);
+            }
+            pthread_mutex_unlock(&mutex_read_write);
+    
             free(client_buffer);
+            return (read_bytes >= 0) ? 0 : -1;
+        }
+    
+        pthread_mutex_lock(&mutex_read_write);
+        size_t written = write(file_fd, client_buffer, total_received);
+        if (written == -1 || written != total_received)
+        {
+            syslog(LOG_ERR, "ERROR: File write failed: %s", strerror(errno));
+            free(client_buffer);
+            pthread_mutex_unlock(&mutex_read_write);
             return -1;
         }
-    #endif
-        
-        //read(file_fd, client_buffer, sizeof(client_buffer));
+    
+    //Write data to file
 
-
-    // Write data to file
-    size_t written = write(file_fd, client_buffer, total_received);
-    if (written == -1 || written != total_received)
-    {
-        LOG("[-] write");
-        syslog(LOG_ERR, "ERROR: File write failed: %s", strerror(errno));
-        free(client_buffer);
-        return -1;
-    }
+    // size_t written = write(file_fd, client_buffer, total_received);
+    // if (written == -1 || written != total_received)
+    // {
+    //     LOG("[-] write");
+    //     syslog(LOG_ERR, "ERROR: File write failed: %s", strerror(errno));
+    //     free(client_buffer);
+    //     return -1;
+    // }
     ////printf("[+] Written %ld bytes \n", total_received);
     // Ensure data is written to disk
     #ifndef USE_AESD_CHAR_DEVICE
