@@ -18,7 +18,6 @@
 #include <linux/cdev.h>
 #include <linux/fs.h> // file_operations
 #include "aesdchar.h"
-#include "aesd_ioctl.h"
 #include <linux/kernel.h>
 int aesd_major =   0; // use dynamic major
 int aesd_minor =   0;
@@ -64,6 +63,7 @@ ssize_t aesd_read(struct file *filp, char __user *buf, size_t count, loff_t *f_p
     ssize_t retval = 0;
     PDEBUG("read %zu bytes with offset %lld", count, *f_pos);
     
+
 
     if (!buf || !filp || !f_pos || *f_pos < 0 || count <= 0) {
         PDEBUG("Invalid input parameters for read syscall");
@@ -253,105 +253,11 @@ unlock_exit:
     return retval;
 }
 
-static loff_t aesd_llseek(struct file *filp, loff_t offset, int cmd){
-    struct aesd_dev *dev = filp->private_data;
-    loff_t new_pos;
-    int total_length = 0;
-
-    struct aesd_buffer_entry *entry;
-    uint8_t index;
-    AESD_CIRCULAR_BUFFER_FOREACH(entry, &dev->buffer, index) {
-        total_length += entry->size;
-    }
-    switch(cmd){
-        
-        case SEEK_SET:          //file offset = offset bytes
-            new_pos = offset;
-            break;
-        case SEEK_CUR:          //file offset = current offset + offset bytes
-            new_pos = filp->f_pos + offset;
-            break;
-        case SEEK_END:          //file offset = total size of the file + offset bytes
-    
-            new_pos = total_length+offset;
-            break;
-        default:
-            return -EINVAL;
-            break;
-    }
-    if(new_pos < 0) return -EINVAL;
-    filp->f_pos = new_pos;
-    PDEBUG("File position seeked to %d",filp->f_pos);
-    return new_pos;
-}
-
-long aesd_unlocked_ioctl(struct file *filp, unsigned int cmd, unsigned long arg) 
-{
-     struct aesd_dev *dev = filp->private_data;
-    long ret_value = 0;
-    struct aesd_seekto seek_params;
-    int total_length = 0;
-    PDEBUG("Inside aesd_unlocked_ioctl");
-    //Check if the command is AESDCHAR_IOCSEEKTO
-    if (cmd != AESDCHAR_IOCSEEKTO)
-    {
-        PDEBUG("Error: aesd_unlocked_ioctl Invalid inputs\n");
-        ret_value = -ENOTTY;
-        goto exit;
-
-    }
-    //Copy from user space to kernel space
-    if (copy_from_user(&seek_params, (struct aesd_seekto __user *)arg, sizeof(seek_params)))
-    {
-        PDEBUG("Error: Copying from user failed\n");
-        ret_value = -EFAULT;
-        goto exit;
-    }
-    //Check if write_cmd exceeds max buffer operations
-    if(seek_params.write_cmd > AESDCHAR_MAX_WRITE_OPERATIONS_SUPPORTED)
-    {
-        PDEBUG("Error: Invalid command index offset\n");
-        ret_value = -EINVAL;
-        goto exit; 
-    }
-
-    seek_params.write_cmd = (seek_params.write_cmd+dev->buffer.out_offs)% AESDCHAR_MAX_WRITE_OPERATIONS_SUPPORTED;
-    PDEBUG("Write cmd is %d, write cmd offset is %d\n",seek_params.write_cmd,seek_params.write_cmd_offset);
-    if(seek_params.write_cmd_offset > dev->buffer.entry[seek_params.write_cmd].size)
-    {
-        PDEBUG("Error: Invalid command command offset\n");
-        ret_value = -EINVAL;
-        goto exit; 
-    }
-    //Lock mutex
-    ret_value = mutex_lock_interruptible(&dev->buffer_lock);
-    if(ret_value !=0)
-    {
-        PDEBUG("Error: Unable to acquire mutex lock\n");
-        ret_value = -ERESTART;
-        goto exit;
-    }
-    // Calculate the total length
-    for(int i=dev->buffer.out_offs;i!=seek_params.write_cmd;)
-    {
-        total_length+=dev->buffer.entry[i].size;
-        i = (i+1)%AESDCHAR_MAX_WRITE_OPERATIONS_SUPPORTED;
-    }
-    filp->f_pos = total_length + seek_params.write_cmd_offset;
-    mutex_unlock(&dev->buffer_lock);
-    PDEBUG("Total size is %d",total_length);
-    PDEBUG("File position seeked to %d",filp->f_pos);
-exit:
-    return ret_value;
-}
-
 struct file_operations aesd_fops = {
     .owner =    THIS_MODULE,
     .read =     aesd_read,
     .write =    aesd_write,
     .open =     aesd_open,
-    .llseek =   aesd_llseek,
-    .unlocked_ioctl = aesd_unlocked_ioctl,    
     .release =  aesd_release,
 
 };
