@@ -184,10 +184,7 @@ ssize_t aesd_write(struct file *filp, const char __user *buf, size_t count, loff
         new_entry.size = count;
         
         aesd_circular_buffer_add_entry(&dev->buffer, &new_entry);
-        // const char *old_buf = aesd_circular_buffer_add_entry(&dev->buffer, &new_entry);
-        // if (old_buf) {
-        //     kfree((void *)old_buf);
-        // }
+      
         
         retval = count;
         tmp_buf = NULL; // Prevent freeing as it's now owned by the buffer
