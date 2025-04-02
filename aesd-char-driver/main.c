@@ -247,58 +247,6 @@ unlock_exit:
     return retval;
 }
 
-loff_t aesd_llseek_2(struct file *filp,loff_t offset,int whence)
-{
-    loff_t ret_value;
-    int total_length = 0;
-    struct aesd_dev *dev = filp->private_data;
-    
-    switch(whence)
-    {
-        case SEEK_SET:
-            //Set the file position to the specified offset
-            ret_value = filp->f_pos;
-            break;
-        case SEEK_CUR:
-            //Set the file position relative to the current position
-            ret_value = filp->f_pos +offset;
-            break;
-        case SEEK_END:
-            //Set the file position relative to the end of the buffer
-            // Attempt to acquire the buffer mutex to calculate total buffer length
-            ret_value = mutex_lock_interruptible(&dev->buffer_lock);
-            if(ret_value !=0)
-            {
-                ret_value = -ERESTART;
-                PDEBUG("Error: Unable to do mutex lock");
-                goto exit;
-            }
-            //Calculate the total length 
-            for(int i= dev->buffer.out_offs; i!=dev->buffer.in_offs;)
-            {
-                total_length +=dev->buffer.entry[i].size;
-                i = (i+1)%AESDCHAR_MAX_WRITE_OPERATIONS_SUPPORTED;
-            }
-            mutex_unlock(&dev->buffer_lock);
-            ret_value = total_length-1+offset;
-            break;
-        default:
-            ret_value = -EINVAL;
-            goto exit;           
-    }
-    if(ret_value<0 )
-    {
-        ret_value = -EINVAL;
-        goto exit;
-    }
-
-   
-    filp->f_pos = ret_value;
-    PDEBUG("File position seeked to %d",filp->f_pos);
-
-exit:
-    return ret_value;
-}
 
 static loff_t aesd_llseek(struct file *filp, loff_t offset, int whence)
 {
@@ -350,7 +298,7 @@ static long aesd_unlocked_ioctl(struct file *filp, unsigned int cmd, unsigned lo
     struct aesd_dev *dev = filp->private_data;
     struct aesd_seekto seekto;
     loff_t new_fpos = 0;
-    uint8_t physical_idx;
+    uint8_t index;
     uint32_t i;
 
     PDEBUG("Inside ioctl");
@@ -372,16 +320,16 @@ static long aesd_unlocked_ioctl(struct file *filp, unsigned int cmd, unsigned lo
         return -EINVAL;
     }
 
-    // Translate logical index to physical index
-    physical_idx = (dev->buffer.out_offs + seekto.write_cmd) % AESDCHAR_MAX_WRITE_OPERATIONS_SUPPORTED;
-    struct aesd_buffer_entry *entry = &dev->buffer.entry[physical_idx];
+    // circular buffer overwrite condition check
+    index = (dev->buffer.out_offs + seekto.write_cmd) % AESDCHAR_MAX_WRITE_OPERATIONS_SUPPORTED;
+    struct aesd_buffer_entry *entry = &dev->buffer.entry[index];
 
     if (!entry->buffptr || seekto.write_cmd_offset >= entry->size) {
         mutex_unlock(&dev->buffer_lock);
         return -EINVAL;
     }
 
-    // Calculate byte offset from beginning
+    // Calculate byte offset 
     for (i = 0; i < seekto.write_cmd; i++) {
         uint8_t idx = (dev->buffer.out_offs + i) % AESDCHAR_MAX_WRITE_OPERATIONS_SUPPORTED;
         new_fpos += dev->buffer.entry[idx].size;
